@@ -17,6 +17,27 @@ export const AiAssistant: React.FC = () => {
   const [isThinking, setIsThinking] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const [isAssistantEnabled, setIsAssistantEnabled] = useState(true);
+
+  useEffect(() => {
+    const checkToggle = () => {
+      try {
+        const rawToggles = localStorage.getItem('lumina_admin_toggles');
+        if (rawToggles) {
+          const parsed = JSON.parse(rawToggles);
+          setIsAssistantEnabled(parsed.enableAiAssistant !== false);
+        }
+      } catch (e) {
+        console.warn(e);
+      }
+    };
+
+    checkToggle();
+    // Re-check periodically or on refocus
+    window.addEventListener('focus', checkToggle);
+    return () => window.removeEventListener('focus', checkToggle);
+  }, []);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -24,6 +45,8 @@ export const AiAssistant: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  if (!isAssistantEnabled) return null;
 
   const handleSend = async () => {
     if (!inputValue.trim()) return;

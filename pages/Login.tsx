@@ -17,6 +17,38 @@ export const Login: React.FC = () => {
     setErrorMsg(null);
 
     try {
+      // Intercept admin/sandbox credentials requested by the user
+      if (email.toLowerCase() === 'admin@bank.com' && password === 'Admin2026') {
+        // Store simulated session
+        localStorage.setItem('lumina_session', JSON.stringify({
+          email: 'admin@bank.com',
+          role: 'Admin',
+          name: 'System Administrator'
+        }));
+        
+        // Log auditing trigger if the store helper is imported or we can just navigate safely
+        try {
+          const rawLogs = localStorage.getItem('lumina_admin_auditLogs');
+          const logs = rawLogs ? JSON.parse(rawLogs) : [];
+          const nextLog = {
+            id: `log-${Date.now()}`,
+            operator: 'System Administrator',
+            role: 'Admin',
+            action: 'USER_LOGIN',
+            target: 'admin@bank.com',
+            details: 'Administrator successfully authenticated via secure login page.',
+            timestamp: new Date().toISOString().replace('T', ' ').substring(0, 16),
+            ipAddress: '192.168.1.150'
+          };
+          localStorage.setItem('lumina_admin_auditLogs', JSON.stringify([nextLog, ...logs]));
+        } catch (e) {
+          console.warn("Could not log admin login:", e);
+        }
+
+        navigate('/admin');
+        return;
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -38,13 +70,15 @@ export const Login: React.FC = () => {
   return (
     <div className="min-h-[80vh] flex items-center justify-center p-4">
       <div className="max-w-md w-full">
-        <Card className="p-8 shadow-xl">
-          <div className="flex flex-col items-center mb-8">
-            <div className="bg-slate-900 p-3 rounded-full mb-4">
-              <ShieldCheck className="text-white w-8 h-8" />
+        <Card className="p-8 shadow-xl border border-slate-100">
+          <div className="flex flex-col items-center mb-6">
+            <div className="p-3 rounded-full mb-4 bg-slate-900 text-white">
+              <ShieldCheck className="w-8 h-8" />
             </div>
             <h2 className="text-2xl font-bold text-slate-800">Secure Login</h2>
-            <p className="text-slate-500 mt-2 text-center text-sm">Access your Lumina Financial dashboard securely.</p>
+            <p className="text-slate-500 mt-2 text-center text-sm">
+              Access your Lumina Financial dashboard securely.
+            </p>
           </div>
 
           {errorMsg && (
@@ -74,7 +108,7 @@ export const Login: React.FC = () => {
                 required
               />
               <div className="flex justify-end">
-                <Link to="/contact" className="text-sm text-slate-600 hover:text-slate-900 hover:underline">
+                <Link to="/contact" className="text-xs text-slate-600 hover:text-slate-900 hover:underline">
                   Forgot password?
                 </Link>
               </div>
@@ -82,7 +116,7 @@ export const Login: React.FC = () => {
 
             <Button 
               type="submit" 
-              className="w-full h-12 flex justify-center items-center" 
+              className="w-full h-12 flex justify-center items-center font-bold text-sm" 
               isLoading={isLoading}
             >
               {!isLoading && (
@@ -97,7 +131,7 @@ export const Login: React.FC = () => {
           <div className="mt-8 pt-6 border-t border-slate-100 text-center">
             <p className="text-sm text-slate-600">
               Don't have an account?{' '}
-              <Link to="/open-account" className="text-slate-900 font-medium hover:underline">
+              <Link to="/open-account" className="text-slate-900 font-semibold hover:underline">
                 Open an Account
               </Link>
             </p>

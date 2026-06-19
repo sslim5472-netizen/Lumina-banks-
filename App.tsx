@@ -15,6 +15,7 @@ import { SBALoanEligibility } from './pages/SBALoanEligibility';
 import { Careers } from './pages/Careers';
 import { Locations } from './pages/Locations';
 import { Help } from './pages/Help';
+import { AdminPanel } from './pages/AdminPanel';
 
 function App() {
   return (
@@ -34,6 +35,7 @@ function App() {
           <Route path="/careers" element={<Careers />} />
           <Route path="/locations" element={<Locations />} />
           <Route path="/help" element={<Help />} />
+          <Route path="/admin" element={<AdminPanel />} />
         </Routes>
       </Layout>
       <AiAssistant />

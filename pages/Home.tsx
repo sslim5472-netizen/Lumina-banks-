@@ -1,10 +1,25 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, Card, SectionHeader } from '../components/UI';
 import { ArrowRight, Shield, TrendingUp, CreditCard, Globe } from 'lucide-react';
 
 export const Home: React.FC = () => {
   const navigate = useNavigate();
+  const [savingsYield, setSavingsYield] = useState(4.50);
+
+  useEffect(() => {
+    try {
+      const rawSystem = localStorage.getItem('lumina_admin_system');
+      if (rawSystem) {
+        const parsed = JSON.parse(rawSystem);
+        if (parsed.baseSavingsYield) {
+          setSavingsYield(parsed.baseSavingsYield);
+        }
+      }
+    } catch (e) {
+      console.warn("Home component load error:", e);
+    }
+  }, []);
 
   return (
     <div className="flex flex-col gap-16 pb-16">
@@ -42,7 +57,7 @@ export const Home: React.FC = () => {
               <TrendingUp className="w-6 h-6 text-emerald-600" />
             </div>
             <h3 className="text-xl font-bold text-slate-900 mb-2">High Yield Savings</h3>
-            <p className="text-slate-600 mb-4">Earn up to 4.50% APY with our premium savings accounts. No hidden fees.</p>
+            <p className="text-slate-600 mb-4">Earn up to {savingsYield.toFixed(2)}% APY with our premium savings accounts. No hidden fees.</p>
             <button onClick={() => navigate('/personal')} className="text-emerald-600 font-medium flex items-center hover:underline">
               Learn more <ArrowRight className="w-4 h-4 ml-1" />
             </button>
