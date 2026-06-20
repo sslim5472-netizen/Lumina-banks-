@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button, Input, Card } from '../components/UI';
 import { Lock, ShieldCheck, AlertCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '../supabaseClient';
+import { getSupabase } from '../supabaseClient';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -49,7 +49,7 @@ export const Login: React.FC = () => {
         return;
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await getSupabase().auth.signInWithPassword({
         email,
         password,
       });

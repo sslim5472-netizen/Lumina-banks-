@@ -208,7 +208,8 @@ export const AdminPanel: React.FC = () => {
   const [modifyingTxId, setModifyingTxId] = useState<string | null>(null);
   const [txModCounterparty, setTxModCounterparty] = useState('');
   const [txModAmount, setTxModAmount] = useState('');
-  const [txModStatus, setTxModStatus] = useState<'Cleared' | 'Pending' | 'Flagged'>('Cleared');
+  const [txModStatus, setTxModStatus] = useState<'Successfully' | 'Pending' | 'Flagged' | 'Hold' | 'Reject'>('Successfully');
+  const [txModOTP, setTxModOTP] = useState('');
 
   // Crypto Wallet modification and creation states
   const [modifyingCryptoAddress, setModifyingCryptoAddress] = useState<string | null>(null);
@@ -707,7 +708,8 @@ export const AdminPanel: React.FC = () => {
       ...t, 
       counterparty: txModCounterparty, 
       amount: amt, 
-      status: txModStatus 
+      status: txModStatus,
+      otpCode: txModOTP
     } : t);
     setTransactions(updated);
     setModifyingTxId(null);
@@ -793,9 +795,9 @@ export const AdminPanel: React.FC = () => {
       return;
     }
     const targetTx = transactions.find(t => t.id === txId);
-    if (!targetTx || targetTx.status === 'Cleared') return;
+    if (!targetTx || targetTx.status === 'Successfully') return;
 
-    const nextStatus = targetTx.status === 'Flagged' ? 'Cleared' : 'Flagged';
+    const nextStatus = targetTx.status === 'Flagged' ? 'Successfully' : 'Flagged';
     const updated = transactions.map(t => t.id === txId ? { ...t, status: nextStatus } : t);
     setTransactions(updated);
 
@@ -818,7 +820,7 @@ export const AdminPanel: React.FC = () => {
     
     const updatedTxs = transactions.map(tx => {
       if (selectedTxIds.includes(tx.id)) {
-        return { ...tx, status: 'Cleared' as const };
+        return { ...tx, status: 'Successfully' as const };
       }
       return tx;
     });
@@ -836,7 +838,7 @@ export const AdminPanel: React.FC = () => {
 
   const handleExportCSV = () => {
     // Current surveillance log represented by filteredTxs
-    const headers = ['Transaction ID', 'Timestamp', 'Origin Name', 'Email', 'Type', 'Narrative / Destination', 'Amount ($)', 'Risk Status'];
+    const headers = ['Transaction ID', 'Timestamp', 'Origin Name', 'Email', 'Type', 'Narrative / Destination', 'Amount ($)', 'Transfer Status'];
     
     const rows = filteredTxs.map(tx => [
       tx.id,
@@ -1192,6 +1194,53 @@ export const AdminPanel: React.FC = () => {
     }
   };
 
+  const handleGenerateOTP = async (email: string, transactionId: string) => {
+    if (!email) {
+      setActiveToast({
+        title: "Missing Email",
+        body: "Cannot generate OTP for a transaction without an associated email address."
+      });
+      return;
+    }
+    try {
+      const response = await fetch('/api/otp/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, transactionId }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const generatedOtp = data.otp;
+        
+        setActiveToast({
+          title: "OTP Generated Successfully",
+          body: `Verification Code: ${generatedOtp}. Notification has been dispatched to ${email}.`
+        });
+        
+        // Update local transaction state
+        const updatedTxs = transactions.map(tx => 
+          tx.id === transactionId ? { ...tx, otpCode: generatedOtp } : tx
+        );
+        setTransactions(updatedTxs);
+        saveAdminStore('transactions', updatedTxs);
+        
+        syncWithStorage('transactions', updatedTxs, 'OTP_GENERATE', email, `Generated OTP ${generatedOtp} for transaction ${transactionId}`);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        setActiveToast({
+          title: "Transmission Error",
+          body: errorData.error || "Failed to communicate with the secure OTP generation gateway."
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      setActiveToast({
+        title: "System Exception",
+        body: "An unexpected error occurred while processing the security token request."
+      });
+    }
+  };
+
   // CMS Updates
   const handleCreateAnnouncement = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1409,21 +1458,33 @@ export const AdminPanel: React.FC = () => {
     <div className="flex flex-col min-h-screen bg-white text-slate-900 antialiased -mt-0">
       {/* REAL-TIME SYSTEM ALERTS TOASTER */}
       {activeToast && (
-        <div className="fixed top-6 right-6 z-50 max-w-sm w-80 bg-rose-50 border-l-4 border-rose-500 shadow-xl rounded-lg p-4 animate-bounce flex gap-3 transition-all duration-300">
-          <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
-            <AlertTriangle className="w-4 h-4 text-rose-600 animate-pulse" />
+        <div className={`fixed top-6 right-6 z-[9999] max-w-sm w-80 shadow-2xl rounded-lg p-4 animate-in fade-in slide-in-from-top-4 duration-300 flex gap-3 ${
+          activeToast.title.includes('Successfully') || activeToast.title.includes('OTP') ? 'bg-emerald-50 border-l-4 border-emerald-500' : 'bg-rose-50 border-l-4 border-rose-500'
+        }`}>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+            activeToast.title.includes('Successfully') || activeToast.title.includes('OTP') ? 'bg-emerald-100' : 'bg-rose-100'
+          }`}>
+            <AlertTriangle className={`w-4 h-4 ${
+              activeToast.title.includes('Successfully') || activeToast.title.includes('OTP') ? 'text-emerald-600' : 'text-rose-600'
+            }`} />
           </div>
           <div className="flex-1">
             <div className="flex justify-between items-start">
-              <span className="text-xs font-bold text-rose-800 uppercase tracking-wider font-mono">CRITICAL VALUE FLAG</span>
+              <span className={`text-[10px] font-bold uppercase tracking-wider font-mono ${
+                activeToast.title.includes('Successfully') || activeToast.title.includes('OTP') ? 'text-emerald-800' : 'text-rose-800'
+              }`}>
+                {activeToast.title.includes('Successfully') || activeToast.title.includes('OTP') ? 'System Confirmation' : 'Security Alert'}
+              </span>
               <button onClick={() => setActiveToast(null)} className="text-slate-400 hover:text-slate-600 text-xs">✕</button>
             </div>
             <h4 className="text-xs font-extrabold text-slate-900 mt-1">{activeToast.title}</h4>
             <p className="text-[11px] text-slate-700 mt-1 leading-relaxed">{activeToast.body}</p>
             <div className="mt-2.5 flex justify-end gap-1">
               <button 
-                onClick={() => { setActiveTab('notifications'); setActiveToast(null); }} 
-                className="bg-rose-600 text-white hover:bg-rose-700 text-[10px] font-bold px-2 py-1 rounded"
+                onClick={() => { setActiveTab('audit'); setActiveToast(null); }} 
+                className={`${
+                  activeToast.title.includes('Successfully') || activeToast.title.includes('OTP') ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-rose-600 hover:bg-rose-700'
+                } text-white text-[10px] font-bold px-2 py-1 rounded`}
               >
                 Inspect Logs
               </button>
@@ -1635,7 +1696,7 @@ export const AdminPanel: React.FC = () => {
 
                 <Card className="p-6 bg-slate-50 border-slate-200 flex flex-col justify-between">
                   <div className="flex justify-between items-start">
-                    <span className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Total Active Loans</span>
+                    <span className="text-slate-500 text-xs font-semibold uppercase tracking-wider">Total Loans</span>
                     <span className="p-2 bg-yellow-500/10 text-yellow-400 rounded">
                       <TrendingUp className="w-5 h-5" />
                     </span>
@@ -2011,7 +2072,7 @@ export const AdminPanel: React.FC = () => {
                       <Input
                         label="First Name"
                         placeholder="John"
-                        value={newCustFirstName}
+                        value={newCustFirstName || ''}
                         onChange={(e) => setNewCustFirstName(e.target.value)}
                         required
                         className="bg-white border-slate-200 text-slate-900 sm:text-xs"
@@ -2019,7 +2080,7 @@ export const AdminPanel: React.FC = () => {
                       <Input
                         label="Last Name"
                         placeholder="Doe"
-                        value={newCustLastName}
+                        value={newCustLastName || ''}
                         onChange={(e) => setNewCustLastName(e.target.value)}
                         required
                         className="bg-white border-slate-200 text-slate-900 sm:text-xs"
@@ -2030,7 +2091,7 @@ export const AdminPanel: React.FC = () => {
                       label="Registry Email Address"
                       type="email"
                       placeholder="john.doe@example.com"
-                      value={newCustEmail}
+                      value={newCustEmail || ''}
                       onChange={(e) => setNewCustEmail(e.target.value)}
                       required
                       className="bg-white border-slate-200 text-slate-900 sm:text-xs"
@@ -2043,7 +2104,7 @@ export const AdminPanel: React.FC = () => {
                           { value: 'Personal', label: 'Personal' },
                           { value: 'Business', label: 'Business' }
                         ]}
-                        value={newCustAccountType}
+                        value={newCustAccountType || ''}
                         onChange={(e) => setNewCustAccountType(e.target.value as any)}
                         className="bg-white border-slate-200 text-slate-900 select-sm text-xs"
                       />
@@ -2069,7 +2130,7 @@ export const AdminPanel: React.FC = () => {
                           { value: 'Suspended', label: 'Suspended' },
                           { value: 'KYC Pending', label: 'KYC Pending' }
                         ]}
-                        value={newCustStatus}
+                        value={newCustStatus || ''}
                         onChange={(e) => setNewCustStatus(e.target.value as any)}
                         className="bg-white border-slate-200 text-slate-900 select-sm text-xs"
                       />
@@ -2078,7 +2139,7 @@ export const AdminPanel: React.FC = () => {
                         label="Initial Balance ($)"
                         placeholder="12500"
                         type="number"
-                        value={newCustBalance}
+                        value={newCustBalance || ''}
                         onChange={(e) => setNewCustBalance(e.target.value)}
                         className="bg-white border-slate-200 text-slate-900 sm:text-xs"
                       />
@@ -2195,7 +2256,7 @@ export const AdminPanel: React.FC = () => {
                   <Input 
                     label="User Email Identity" 
                     placeholder="sarah.j@gmail.com" 
-                    value={txEmail}
+                    value={txEmail || ''}
                     onChange={(e) => setTxEmail(e.target.value)}
                     required
                     className="bg-white border-slate-200 text-slate-900 sm:text-xs"
@@ -2253,9 +2314,9 @@ export const AdminPanel: React.FC = () => {
                   <div>
                     <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
                       <Activity className="w-4 h-4 text-amber-500" />
-                      AML Risk Trend: Flagged Transaction Frequency (Last 30 Days)
+                      Transfer Status Trend: Flagged Transaction Frequency (Last 30 Days)
                     </h3>
-                    <p className="text-[11px] text-slate-500">Live surveillance line chart mapping real-time frequency of flagged AML logs across policy nodes.</p>
+                    <p className="text-[11px] text-slate-500">Live surveillance line chart mapping real-time frequency of flagged transfer logs across policy nodes.</p>
                   </div>
                   <div className="bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded text-[10px] font-bold text-amber-600">
                     Active Flags: {transactions.filter(t => t.status === 'Flagged').length}
@@ -2317,7 +2378,7 @@ export const AdminPanel: React.FC = () => {
                       <input 
                         type="email" 
                         placeholder="sarah.j@gmail.com" 
-                        value={txEmail}
+                        value={txEmail || ''}
                         onChange={(e) => setTxEmail(e.target.value)}
                         required
                         className="w-full bg-white border border-slate-200 text-slate-900 rounded px-3 py-2 text-xs focus:ring focus:ring-emerald-500/50 outline-none animate-none"
@@ -2326,7 +2387,7 @@ export const AdminPanel: React.FC = () => {
                     <div>
                       <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5">Transaction Code</label>
                       <select 
-                        value={txType}
+                        value={txType || ''}
                         onChange={(e) => setTxType(e.target.value as any)}
                         className="w-full bg-white border border-slate-200 text-slate-900 rounded px-3 py-2 text-xs focus:ring focus:ring-emerald-500/50 outline-none animate-none"
                       >
@@ -2342,7 +2403,7 @@ export const AdminPanel: React.FC = () => {
                       <input 
                         type="number"
                         placeholder="1500" 
-                        value={txAmount}
+                        value={txAmount || ''}
                         onChange={(e) => setTxAmount(e.target.value)}
                         required
                         className="w-full bg-white border border-slate-200 text-slate-900 rounded px-3 py-2 text-xs focus:ring focus:ring-emerald-500/50 outline-none animate-none"
@@ -2353,7 +2414,7 @@ export const AdminPanel: React.FC = () => {
                       <input 
                         type="text" 
                         placeholder="ACH Payroll / Direct Wire" 
-                        value={txCounterparty}
+                        value={txCounterparty || ''}
                         onChange={(e) => setTxCounterparty(e.target.value)}
                         required
                         className="w-full bg-white border border-slate-200 text-slate-900 rounded px-3 py-2 text-xs focus:ring focus:ring-emerald-500/50 outline-none animate-none"
@@ -2384,7 +2445,7 @@ export const AdminPanel: React.FC = () => {
                 <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4 mb-6">
                   <div>
                     <h2 className="text-lg font-bold text-slate-900">Live Wire & Transaction surveillance</h2>
-                    <p className="text-slate-500 text-xs text-left">Intercept AML alarms, reverse transactions, and analyze suspicious account withdrawals.</p>
+                    <p className="text-slate-500 text-xs text-left">Intercept transfer alarms, reverse transactions, and analyze suspicious account withdrawals.</p>
                   </div>
                   
                   <div className="flex flex-wrap gap-2 w-full xl:w-auto">
@@ -2496,7 +2557,7 @@ export const AdminPanel: React.FC = () => {
                         <th className="py-3 px-4">Category</th>
                         <th className="py-3 px-4 text-rose-350">Narrative / Destination</th>
                         <th className="py-3 px-4">Funds ($)</th>
-                        <th className="py-3 px-4">AML Risk</th>
+                        <th className="py-3 px-4">Transfer Status</th>
                         <th className="py-3 px-4 text-right">Actions</th>
                       </tr>
                     </thead>
@@ -2533,15 +2594,34 @@ export const AdminPanel: React.FC = () => {
                           {modifyingTxId === tx.id ? (
                             <>
                               <td className="py-3 px-4">
-                                <input className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded px-2 py-1 text-xs" value={txModCounterparty} onChange={e => setTxModCounterparty(e.target.value)} />
+                                <input className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded px-2 py-1 text-xs mb-1" value={txModCounterparty || ''} onChange={e => setTxModCounterparty(e.target.value)} />
+                                <div className="flex flex-col gap-1.5 mt-1">
+                                  <input className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded px-2 py-1.5 text-xs font-mono" value={txModOTP || ''} onChange={e => setTxModOTP(e.target.value)} placeholder="Verification OTP" />
+                                  <div className="flex gap-2">
+                                    <button 
+                                      onClick={() => handleUpdateTransaction(tx.id)} 
+                                      className="flex-1 bg-emerald-600 text-white rounded py-2 text-[10px] font-black uppercase tracking-tight hover:bg-emerald-700 transition-all shadow-md flex items-center justify-center gap-1.5"
+                                    >
+                                      <Check className="w-3.5 h-3.5" /> Confirm
+                                    </button>
+                                    <button 
+                                      onClick={() => setModifyingTxId(null)} 
+                                      className="flex-1 bg-slate-200 text-slate-700 rounded py-2 text-[10px] font-black uppercase tracking-tight hover:bg-rose-600 hover:text-white transition-all shadow-sm flex items-center justify-center gap-1.5 border border-slate-300"
+                                    >
+                                      <XCircle className="w-3.5 h-3.5" /> Reject
+                                    </button>
+                                  </div>
+                                </div>
                               </td>
                               <td className="py-3 px-4">
-                                <input type="number" className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded px-2 py-1 text-xs" value={txModAmount} onChange={e => setTxModAmount(e.target.value)} />
+                                <input type="number" className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded px-2 py-1 text-xs" value={txModAmount || ''} onChange={e => setTxModAmount(e.target.value)} />
                               </td>
                               <td className="py-3 px-4">
                                 <select className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded px-2 py-1 text-xs" value={txModStatus} onChange={e => setTxModStatus(e.target.value as any)}>
-                                  <option value="Cleared">Cleared</option>
+                                  <option value="Successfully">Successfully</option>
                                   <option value="Pending">Pending</option>
+                                  <option value="Hold">Hold</option>
+                                  <option value="Reject">Reject</option>
                                   <option value="Flagged">Flagged</option>
                                 </select>
                               </td>
@@ -2553,7 +2633,9 @@ export const AdminPanel: React.FC = () => {
                               <td className="py-3 px-4">
                                 <span className={`inline-flex items-center gap-1 font-bold ${
                                   tx.status === 'Flagged' ? 'text-amber-600' :
-                                  tx.status === 'Pending' ? 'text-blue-600' : 'text-emerald-600'
+                                  tx.status === 'Pending' ? 'text-blue-600' : 
+                                  tx.status === 'Hold' ? 'text-orange-600' :
+                                  tx.status === 'Reject' ? 'text-rose-600' : 'text-emerald-600'
                                 }`}>
                                   {tx.status === 'Flagged' && <AlertTriangle className="w-3.5 h-3.5" />}
                                   {tx.status}
@@ -2564,10 +2646,9 @@ export const AdminPanel: React.FC = () => {
                           <td className="py-3 px-4 text-right font-sans">
                             <div className="flex gap-1 justify-end items-center">
                               {modifyingTxId === tx.id ? (
-                                <>
-                                  <button onClick={() => handleUpdateTransaction(tx.id)} className="text-emerald-500 hover:text-emerald-600" title="Save"><Check className="w-4 h-4" /></button>
-                                  <button onClick={() => setModifyingTxId(null)} className="text-rose-500 hover:text-rose-600" title="Cancel"><XCircle className="w-4 h-4" /></button>
-                                </>
+                                <div className="w-full text-right pr-2">
+                                  <span className="text-[9px] font-bold text-slate-400 italic">Editing active session...</span>
+                                </div>
                               ) : (
                                 <>
                                   <button 
@@ -2576,17 +2657,24 @@ export const AdminPanel: React.FC = () => {
                                       setTxModCounterparty(tx.counterparty);
                                       setTxModAmount(tx.amount.toString());
                                       setTxModStatus(tx.status);
+                                      setTxModOTP(tx.otpCode || '');
                                     }}
                                     className="px-2 py-1 rounded text-[10px] font-bold border border-slate-300 bg-white text-slate-700 hover:bg-slate-200 transition-colors"
                                   >
                                     Edit
                                   </button>
-                                  {tx.status === 'Cleared' ? (
+                                  <button 
+                                    onClick={() => handleGenerateOTP(tx.email, tx.id)}
+                                    className="px-2 py-1 rounded text-[10px] bg-indigo-100 border border-indigo-800 text-indigo-700 font-bold hover:bg-indigo-200 transition-colors"
+                                  >
+                                    Gen OTP
+                                  </button>
+                                  {tx.status === 'Successfully' ? (
                                     <button 
                                       disabled
                                       className="px-2 py-1 rounded text-[10px] font-bold border border-emerald-200/30 bg-emerald-100/10 text-emerald-600 cursor-not-allowed opacity-80"
                                     >
-                                      Suspension Cleared
+                                      Transfer Successfully
                                     </button>
                                   ) : (
                                     <button 
@@ -2597,7 +2685,7 @@ export const AdminPanel: React.FC = () => {
                                           : 'bg-amber-100 border-amber-300 text-amber-700 hover:bg-amber-900'
                                       }`}
                                     >
-                                      {tx.status === 'Flagged' ? 'Clear Suspicion' : 'AML Hold'}
+                                      {tx.status === 'Flagged' ? 'Clear Suspicion' : 'Status Hold'}
                                     </button>
                                   )}
 
@@ -2667,11 +2755,11 @@ export const AdminPanel: React.FC = () => {
                       </div>
                       <div>
                         <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5">Initial Balance</label>
-                        <input type="number" step="any" className="w-full bg-slate-50 border border-slate-200 text-xs px-2 py-1.5 rounded font-mono" value={newCryptoBalance} onChange={e => setNewCryptoBalance(e.target.value)} />
+                        <input type="number" step="any" className="w-full bg-slate-50 border border-slate-200 text-xs px-2 py-1.5 rounded font-mono" value={newCryptoBalance || ''} onChange={e => setNewCryptoBalance(e.target.value)} />
                       </div>
                       <div>
                         <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5">Fiat Eq ($)</label>
-                        <input type="number" step="any" className="w-full bg-slate-50 border border-slate-200 text-xs px-2 py-1.5 rounded font-mono" value={newCryptoFiat} onChange={e => setNewCryptoFiat(e.target.value)} />
+                        <input type="number" step="any" className="w-full bg-slate-50 border border-slate-200 text-xs px-2 py-1.5 rounded font-mono" value={newCryptoFiat || ''} onChange={e => setNewCryptoFiat(e.target.value)} />
                       </div>
                     </div>
                     <div className="mt-4 flex justify-end">
@@ -2844,7 +2932,7 @@ export const AdminPanel: React.FC = () => {
                           <input 
                             type="text" 
                             required
-                            value={kycFormName}
+                            value={kycFormName || ''}
                             onChange={(e) => setKycFormName(e.target.value)}
                             placeholder="John Doe"
                             className="w-full bg-white border border-slate-200 rounded px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring focus:ring-indigo-500/50"
@@ -2855,7 +2943,7 @@ export const AdminPanel: React.FC = () => {
                           <input 
                             type="email" 
                             required
-                            value={kycFormEmail}
+                            value={kycFormEmail || ''}
                             onChange={(e) => setKycFormEmail(e.target.value)}
                             placeholder="johndoe@example.com"
                             className="w-full bg-white border border-slate-200 rounded px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring focus:ring-indigo-500/50"
@@ -2867,7 +2955,7 @@ export const AdminPanel: React.FC = () => {
                         <label className="block text-xs font-semibold text-slate-500 mb-1">Internal Notes</label>
                         <textarea 
                           rows={3}
-                          value={kycFormNotes}
+                          value={kycFormNotes || ''}
                           onChange={(e) => setKycFormNotes(e.target.value)}
                           placeholder="Federal watchlist cross-referencing completed, etc."
                           className="w-full bg-white border border-slate-200 rounded px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring focus:ring-indigo-500/50"
@@ -2878,7 +2966,7 @@ export const AdminPanel: React.FC = () => {
                         <div>
                           <label className="block text-xs font-semibold text-slate-500 mb-1">Passport Status</label>
                           <select 
-                            value={kycFormPassportStatus}
+                            value={kycFormPassportStatus || ''}
                             onChange={(e: any) => setKycFormPassportStatus(e.target.value)}
                             className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring"
                           >
@@ -2890,7 +2978,7 @@ export const AdminPanel: React.FC = () => {
                         <div>
                           <label className="block text-xs font-semibold text-slate-500 mb-1">Facial ID Match</label>
                           <select 
-                            value={kycFormFaceStatus}
+                            value={kycFormFaceStatus || ''}
                             onChange={(e: any) => setKycFormFaceStatus(e.target.value)}
                             className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring"
                           >
@@ -2902,7 +2990,7 @@ export const AdminPanel: React.FC = () => {
                         <div>
                           <label className="block text-xs font-semibold text-slate-500 mb-1">Utility Bill Check</label>
                           <select 
-                            value={kycFormUtilityStatus}
+                            value={kycFormUtilityStatus || ''}
                             onChange={(e: any) => setKycFormUtilityStatus(e.target.value)}
                             className="w-full bg-white border border-slate-200 rounded px-2.5 py-1.5 text-xs text-slate-900 focus:outline-none focus:ring"
                           >
@@ -3897,7 +3985,7 @@ export const AdminPanel: React.FC = () => {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <Input 
                       label="Application Title Name" 
-                      value={system.appName}
+                      value={system.appName || ''}
                       onChange={(e) => handleUpdateSystemSetting('appName', e.target.value)}
                       className="bg-white border-slate-200 text-slate-900"
                     />
@@ -3909,7 +3997,7 @@ export const AdminPanel: React.FC = () => {
                         { value: 'EUR', label: 'Euros (€)' },
                         { value: 'GBP', label: 'British Pounds (£)' }
                       ]}
-                      value={system.baseCurrency}
+                      value={system.baseCurrency || ''}
                       onChange={(e) => handleUpdateSystemSetting('baseCurrency', e.target.value)}
                       className="bg-white border-slate-200 text-slate-900"
                     />
@@ -3921,7 +4009,7 @@ export const AdminPanel: React.FC = () => {
                       <input 
                         type="number" 
                         step="0.05"
-                        value={system.baseSavingsYield}
+                        value={system.baseSavingsYield ?? 0}
                         onChange={(e) => handleUpdateSystemSetting('baseSavingsYield', parseFloat(e.target.value))}
                         className="bg-white text-slate-900 rounded border border-slate-200 px-3 py-2 text-xs w-full outline-none focus:ring focus:ring-emerald-500/50"
                       />
@@ -3931,7 +4019,7 @@ export const AdminPanel: React.FC = () => {
                       <label className="block text-sm font-medium text-slate-700 mb-1">Max Automatic Loan Limits ($)</label>
                       <input 
                         type="number" 
-                        value={system.loanApprovalLimit}
+                        value={system.loanApprovalLimit ?? 0}
                         onChange={(e) => handleUpdateSystemSetting('loanApprovalLimit', parseInt(e.target.value))}
                         className="bg-white text-slate-900 rounded border border-slate-200 px-3 py-2 text-xs w-full outline-none focus:ring focus:ring-emerald-500/50"
                       />

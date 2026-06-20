@@ -6,6 +6,7 @@ import { Button } from './UI';
 const navItems = [
   { label: 'Personal', path: '/personal' },
   { label: 'Business', path: '/business' },
+  { label: 'Transfer', path: '/transfer' },
   { label: 'Credit Cards', path: '/credit-cards' },
   { label: 'Loans', path: '/loans' },
   { label: 'About', path: '/about' },

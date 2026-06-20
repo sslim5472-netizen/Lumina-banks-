@@ -28,8 +28,9 @@ export interface AdminTransaction {
   name: string;
   type: 'Deposit' | 'Withdrawal' | 'Transfer' | 'Wire' | 'Swap';
   amount: number;
-  status: 'Cleared' | 'Pending' | 'Flagged';
+  status: 'Successfully' | 'Pending' | 'Flagged' | 'Hold' | 'Reject';
   counterparty: string;
+  otpCode?: string; // New field
 }
 
 export interface CryptoWallet {
@@ -142,11 +143,11 @@ const initialAccounts: AdminAccount[] = [
 ];
 
 const initialTransactions: AdminTransaction[] = [
-  { id: 'tx-101', timestamp: '2026-06-19 09:12', email: 'sarah.j@gmail.com', name: 'Sarah Jenkins', type: 'Deposit', amount: 2500.00, status: 'Cleared', counterparty: 'ACH Payroll - Lumina Corp' },
-  { id: 'tx-102', timestamp: '2026-06-19 08:30', email: 'mchen.biz@work.com', name: 'Michael Chen', type: 'Wire', amount: 45000.00, status: 'Cleared', counterparty: 'Pacific Steel Supplies LLC' },
-  { id: 'tx-103', timestamp: '2026-06-18 17:45', email: 'emily.rod@outlook.com', name: 'Emily Rodriguez', type: 'Withdrawal', amount: 80.00, status: 'Cleared', counterparty: 'ATM Westside Branch' },
+  { id: 'tx-101', timestamp: '2026-06-19 09:12', email: 'sarah.j@gmail.com', name: 'Sarah Jenkins', type: 'Deposit', amount: 2500.00, status: 'Successfully', counterparty: 'ACH Payroll - Lumina Corp' },
+  { id: 'tx-102', timestamp: '2026-06-19 08:30', email: 'mchen.biz@work.com', name: 'Michael Chen', type: 'Wire', amount: 45000.00, status: 'Successfully', counterparty: 'Pacific Steel Supplies LLC' },
+  { id: 'tx-103', timestamp: '2026-06-18 17:45', email: 'emily.rod@outlook.com', name: 'Emily Rodriguez', type: 'Withdrawal', amount: 80.00, status: 'Successfully', counterparty: 'ATM Westside Branch' },
   { id: 'tx-104', timestamp: '2026-06-18 15:20', email: 'jordanb@techcorp.io', name: 'Jordan Blake', type: 'Transfer', amount: 15400.00, status: 'Flagged', counterparty: 'Suspicious Crypto Swap Corp' },
-  { id: 'tx-105', timestamp: '2026-06-17 11:10', email: 'sarah.j@gmail.com', name: 'Sarah Jenkins', type: 'Swap', amount: 500.00, status: 'Cleared', counterparty: 'Lumina Bitcoin Hotwallet' },
+  { id: 'tx-105', timestamp: '2026-06-17 11:10', email: 'sarah.j@gmail.com', name: 'Sarah Jenkins', type: 'Swap', amount: 500.00, status: 'Successfully', counterparty: 'Lumina Bitcoin Hotwallet' },
   { id: 'tx-106', timestamp: '2026-06-17 06:05', email: 'kaufman.alex@gmail.com', name: 'Alex Kaufman', type: 'Deposit', amount: 1250.00, status: 'Pending', counterparty: 'Card Deposit - Bank of NY' }
 ];
 

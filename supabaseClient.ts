@@ -1,8 +1,20 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
-// ⚠️ IMPORTANT: You must replace 'https://YOUR_PROJECT_ID.supabase.co' with your actual Supabase Project URL.
-// The key you provided is a publishable key.
-const supabaseUrl = 'https://YOUR_PROJECT_ID.supabase.co'; 
-const supabaseKey = 'sb_publishable_NPNTpgKWqozYTDjiptQtPQ__PsT7lug';
+let supabaseClient: SupabaseClient | null = null;
 
-export const supabase = createClient(supabaseUrl, supabaseKey);
+export function getSupabase(): SupabaseClient {
+  if (!supabaseClient) {
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl) {
+      throw new Error('VITE_SUPABASE_URL environment variable is required');
+    }
+    if (!supabaseKey) {
+      throw new Error('VITE_SUPABASE_ANON_KEY environment variable is required');
+    }
+
+    supabaseClient = createClient(supabaseUrl, supabaseKey);
+  }
+  return supabaseClient;
+}

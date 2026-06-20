@@ -8,7 +8,7 @@ export const OpenAccount: React.FC = () => {
   const [accountType, setAccountType] = useState<AccountType | null>(null);
   const [formData, setFormData] = useState({
     // Personal Fields
-    firstName: '', lastName: '', email: '', phone: '', address: '', ssn: '', dob: '',
+    firstName: '', lastName: '', email: '', phone: '', address: '', ssn: '', dob: '', password: '',
     // Business Fields
     businessName: '', ein: '', businessPhone: '', businessAddress: '', industry: '', annualRevenue: '', 
     legalStructure: 'llc', dateEstablished: ''

@@ -2,5 +2,5 @@
   "name": "Lumina Financial",
   "description": "A next-generation, secure, and fully responsive banking platform featuring personal, business, and lending solutions with AI-powered support.",
   "requestFramePermissions": [],
-  "majorCapabilities": []
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

@@ -46,6 +46,19 @@ const cards: CreditCardProduct[] = [
   }
 ];
 
+const FilterButton = ({ label, value, active, onClick }: { label: string, value: 'all' | 'cash' | 'travel' | 'business', active: boolean, onClick: (v: 'all' | 'cash' | 'travel' | 'business') => void }) => (
+  <button 
+    onClick={() => onClick(value)}
+    className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
+        active 
+        ? 'bg-slate-900 text-white shadow-md' 
+        : 'bg-white text-slate-600 hover:bg-gray-100 border border-gray-200'
+    }`}
+  >
+    {label}
+  </button>
+);
+
 export const CreditCards: React.FC = () => {
   const [filter, setFilter] = useState<'all' | 'cash' | 'travel' | 'business'>('all');
   const [sortBy, setSortBy] = useState<string>('recommended');
@@ -72,23 +85,10 @@ export const CreditCards: React.FC = () => {
     return result;
   }, [filter, sortBy]);
 
-  const FilterButton = ({ label, value }: { label: string, value: typeof filter }) => (
-    <button 
-      onClick={() => setFilter(value)}
-      className={`px-4 py-2 rounded-full text-sm font-medium transition-all ${
-          filter === value 
-          ? 'bg-slate-900 text-white shadow-md' 
-          : 'bg-white text-slate-600 hover:bg-gray-100 border border-gray-200'
-      }`}
-    >
-      {label}
-    </button>
-  );
-
   return (
     <div className="py-12 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <SectionHeader title="Find the right card for you" subtitle="Whether you want cash back, travel rewards, or business perks, we have you covered." />
-      
+
       {/* Controls */}
       <div className="flex flex-col md:flex-row items-center justify-between gap-6 mb-12 bg-gray-50 p-4 rounded-2xl border border-gray-200">
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
@@ -96,10 +96,10 @@ export const CreditCards: React.FC = () => {
               <Filter className="w-4 h-4 mr-2" /> Filter:
           </div>
           <div className="flex flex-wrap gap-2 justify-center sm:justify-start">
-              <FilterButton label="View All" value="all" />
-              <FilterButton label="Cash Back" value="cash" />
-              <FilterButton label="Travel Rewards" value="travel" />
-              <FilterButton label="Business" value="business" />
+              <FilterButton label="View All" value="all" active={filter === 'all'} onClick={setFilter} />
+              <FilterButton label="Cash Back" value="cash" active={filter === 'cash'} onClick={setFilter} />
+              <FilterButton label="Travel Rewards" value="travel" active={filter === 'travel'} onClick={setFilter} />
+              <FilterButton label="Business" value="business" active={filter === 'business'} onClick={setFilter} />
           </div>
         </div>
 

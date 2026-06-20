@@ -2,6 +2,7 @@ import React from 'react';
 import { HashRouter as Router, Routes, Route } from 'react-router-dom';
 import { Layout } from './components/Layout';
 import { AiAssistant } from './components/AiAssistant';
+import { Transfer } from './pages/Transfer';
 import { Home } from './pages/Home';
 import { Personal } from './pages/Personal';
 import { Business } from './pages/Business';
@@ -23,6 +24,7 @@ function App() {
       <Layout>
         <Routes>
           <Route path="/" element={<Home />} />
+          <Route path="/transfer" element={<Transfer />} />
           <Route path="/personal" element={<Personal />} />
           <Route path="/business" element={<Business />} />
           <Route path="/credit-cards" element={<CreditCards />} />

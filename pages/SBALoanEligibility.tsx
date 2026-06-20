@@ -132,7 +132,7 @@ export const SBALoanEligibility: React.FC = () => {
                     <Select 
                         name="yearsInBusiness"
                         label="Time in Business"
-                        value={formData.yearsInBusiness}
+                        value={formData.yearsInBusiness || ''}
                         onChange={handleChange}
                         required
                         options={[
@@ -146,7 +146,7 @@ export const SBALoanEligibility: React.FC = () => {
                     <Select 
                         name="creditScore"
                         label="Owner's Estimated Credit Score"
-                        value={formData.creditScore}
+                        value={formData.creditScore || ''}
                         onChange={handleChange}
                         required
                         options={[
@@ -165,7 +165,7 @@ export const SBALoanEligibility: React.FC = () => {
                         label="Annual Revenue" 
                         type="number" 
                         placeholder="e.g. 500000" 
-                        value={formData.annualRevenue} 
+                        value={formData.annualRevenue || ''} 
                         onChange={handleChange} 
                         required
                     />
@@ -174,7 +174,7 @@ export const SBALoanEligibility: React.FC = () => {
                         label="Requested Loan Amount" 
                         type="number" 
                         placeholder="e.g. 150000" 
-                        value={formData.loanAmount} 
+                        value={formData.loanAmount || ''} 
                         onChange={handleChange} 
                         required
                     />
@@ -186,7 +186,7 @@ export const SBALoanEligibility: React.FC = () => {
                         <Select 
                             name="defaultHistory"
                             label="Prior Government Loan Default?"
-                            value={formData.defaultHistory}
+                            value={formData.defaultHistory || ''}
                             onChange={handleChange}
                             options={[
                                 { value: 'no', label: 'No' },
@@ -196,7 +196,7 @@ export const SBALoanEligibility: React.FC = () => {
                         <Select 
                             name="bankruptcy"
                             label="Past Bankruptcy?"
-                            value={formData.bankruptcy}
+                            value={formData.bankruptcy || ''}
                             onChange={handleChange}
                             options={[
                                 { value: 'no', label: 'No' },
@@ -209,7 +209,7 @@ export const SBALoanEligibility: React.FC = () => {
                  <Select 
                     name="useOfFunds"
                     label="Primary Use of Funds"
-                    value={formData.useOfFunds}
+                    value={formData.useOfFunds || ''}
                     onChange={handleChange}
                     options={[
                         { value: 'expansion', label: 'Business Expansion' },
