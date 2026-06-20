@@ -174,7 +174,7 @@ export const Personal: React.FC = () => {
                 Lumina Pulse Analytics
               </div>
               <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 mt-1">Personal Financial Dashboard</h2>
-              <p className="text-slate-500 text-xs">Simulate direct transactions to see real-time chart projections.</p>
+              <p className="text-slate-500 text-xs">Perform transactions to see real-time chart projections.</p>
             </div>
             
             <button 
@@ -182,7 +182,7 @@ export const Personal: React.FC = () => {
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:text-indigo-600 hover:bg-slate-50 text-xs font-semibold transition-all shadow-xs"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              Reset Simulation State
+              Reset State
             </button>
           </div>
 
@@ -410,7 +410,7 @@ export const Personal: React.FC = () => {
               
               {/* Add simulated card expense */}
               <form onSubmit={handleAddExpense} className="space-y-3">
-                <div className="text-[11px] font-bold text-indigo-700 uppercase">Simulate Card Purchases</div>
+                <div className="text-[11px] font-bold text-indigo-700 uppercase">Card Purchases</div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[10px] text-slate-500 mb-0.5 font-bold">Expense Category</label>
@@ -444,7 +444,7 @@ export const Personal: React.FC = () => {
                   type="submit"
                   className="w-full py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm"
                 >
-                  <Plus className="w-3.5 h-3.5" /> Allocate simulated Expense
+                  <Plus className="w-3.5 h-3.5" /> Allocate Expense
                 </button>
               </form>
 
@@ -472,7 +472,7 @@ export const Personal: React.FC = () => {
                   type="submit"
                   className="w-full py-1.5 bg-emerald-650 hover:bg-emerald-600 text-white rounded text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm"
                 >
-                  <Plus className="w-3.5 h-3.5" /> Boost simulated Income
+                  <Plus className="w-3.5 h-3.5" /> Boost Income
                 </button>
               </form>
 

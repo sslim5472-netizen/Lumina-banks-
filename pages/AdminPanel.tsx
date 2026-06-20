@@ -37,7 +37,8 @@ import {
   CheckSquare,
   Bell,
   FileText,
-  Terminal
+  Terminal,
+  Clock
 } from 'lucide-react';
 import { 
   getMockUsers, 
@@ -178,6 +179,12 @@ export const AdminPanel: React.FC = () => {
   const [txCounterparty, setTxCounterparty] = useState('');
   const [showCreateTxForm, setShowCreateTxForm] = useState(false);
   const [selectedTxIds, setSelectedTxIds] = useState<string[]>([]);
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [activeToast, setActiveToast] = useState<{title: string, body: string} | null>(null);
+  const [suspiciousThreshold, setSuspiciousThreshold] = useState<number>(() => {
+    const raw = localStorage.getItem('lumina_admin_suspicious_threshold');
+    return raw ? parseFloat(raw) : 10000;
+  });
 
   // Custom KYC creator states
   const [showCreateKycForm, setShowCreateKycForm] = useState(false);
@@ -192,6 +199,40 @@ export const AdminPanel: React.FC = () => {
   // Balance Modifier states
   const [modifyingAccKey, setModifyingAccKey] = useState<string | null>(null);
   const [accModValue, setAccModValue] = useState('');
+  const [accModName, setAccModName] = useState('');
+  const [accModEmail, setAccModEmail] = useState('');
+  const [accModType, setAccModType] = useState<'Checking' | 'Savings' | 'Loan'>('Checking');
+  const [accModRate, setAccModRate] = useState('');
+
+  // Transaction Modifier states
+  const [modifyingTxId, setModifyingTxId] = useState<string | null>(null);
+  const [txModCounterparty, setTxModCounterparty] = useState('');
+  const [txModAmount, setTxModAmount] = useState('');
+  const [txModStatus, setTxModStatus] = useState<'Cleared' | 'Pending' | 'Flagged'>('Cleared');
+
+  // Crypto Wallet modification and creation states
+  const [modifyingCryptoAddress, setModifyingCryptoAddress] = useState<string | null>(null);
+  const [cryptoModEmail, setCryptoModEmail] = useState('');
+  const [cryptoModAsset, setCryptoModAsset] = useState('');
+  const [cryptoModBalance, setCryptoModBalance] = useState('');
+  const [cryptoModFiat, setCryptoModFiat] = useState('');
+  
+  const [showCreateCryptoForm, setShowCreateCryptoForm] = useState(false);
+  const [newCryptoEmail, setNewCryptoEmail] = useState('');
+  const [newCryptoAsset, setNewCryptoAsset] = useState('BTC');
+  const [newCryptoAddress, setNewCryptoAddress] = useState('');
+  const [newCryptoBalance, setNewCryptoBalance] = useState('');
+  const [newCryptoFiat, setNewCryptoFiat] = useState('');
+
+  // User Modifier states
+  const [modifyingUserId, setModifyingUserId] = useState<string | null>(null);
+  const [userModFirstName, setUserModFirstName] = useState('');
+  const [userModLastName, setUserModLastName] = useState('');
+  const [userModEmail, setUserModEmail] = useState('');
+  const [userModRole, setUserModRole] = useState<'Admin' | 'Compliance' | 'Editor' | 'Developer'>('Compliance');
+  const [userModAccountType, setUserModAccountType] = useState<'Personal' | 'Business'>('Personal');
+  const [userModBalance, setUserModBalance] = useState('');
+  const [userModStatus, setUserModStatus] = useState<'Active' | 'Suspended' | 'KYC Pending' | 'Pending'>('Active');
 
   // New Customer registration state
   const [newCustFirstName, setNewCustFirstName] = useState('');
@@ -214,48 +255,58 @@ export const AdminPanel: React.FC = () => {
     clicksCount: number;
   }
 
-  const [notifications, setNotifications] = useState<AdminNotification[]>([
-    {
-      id: 'notif-1',
-      title: 'Scheduled Core Security Ledger Patch',
-      body: 'Lumina Digital Banking Core Ledger will undergo a rolling software update tonight at 23:00 UTC. ATM withdrawals may experience brief card confirmation delays up to 45 seconds.',
-      type: 'System Update',
-      targetSegment: 'All',
-      dispatchedAt: new Date(Date.now() - 3600000 * 2).toISOString().replace('T', ' ').substring(0, 19),
-      status: 'Active',
-      clicksCount: 1420
-    },
-    {
-      id: 'notif-2',
-      title: 'Suspicious Offshore VPN Login Blocked',
-      body: 'WAF system has triggered an IP blacklist block for clients routing through high-risk geo-proxies. Secure authentication challenges are active.',
-      type: 'Critical Alert',
-      targetSegment: 'Admin Staff',
-      dispatchedAt: new Date(Date.now() - 3600000 * 8).toISOString().replace('T', ' ').substring(0, 19),
-      status: 'Active',
-      clicksCount: 88
-    },
-    {
-      id: 'notif-3',
-      title: 'Corporate Wire Standard Verification Rules',
-      body: 'Please remind high-net-worth commercial business accounts that outbound wires exceeding $150,000 necessitate second-officer signature matching.',
-      type: 'Info',
-      targetSegment: 'Business',
-      dispatchedAt: new Date(Date.now() - 3600000 * 24).toISOString().replace('T', ' ').substring(0, 19),
-      status: 'Active',
-      clicksCount: 345
-    },
-    {
-      id: 'notif-4',
-      title: 'Seasonal Higher Yield Savings Campaign Notice',
-      body: 'Promotional CD yield rates are live. Digital customer portals will display seasonal billboard banners with APY projections.',
-      type: 'Warning',
-      targetSegment: 'Personal',
-      dispatchedAt: new Date(Date.now() - 3600000 * 48).toISOString().replace('T', ' ').substring(0, 19),
-      status: 'Archived',
-      clicksCount: 1205
+  const [notifications, setNotifications] = useState<AdminNotification[]>(() => {
+    const raw = localStorage.getItem('lumina_admin_notifications_state');
+    if (!raw) {
+      return [
+        {
+          id: 'notif-1',
+          title: 'Scheduled Core Security Ledger Patch',
+          body: 'Lumina Digital Banking Core Ledger will undergo a rolling software update tonight at 23:00 UTC. ATM withdrawals may experience brief card confirmation delays up to 45 seconds.',
+          type: 'System Update',
+          targetSegment: 'All',
+          dispatchedAt: new Date(Date.now() - 3600000 * 2).toISOString().replace('T', ' ').substring(0, 19),
+          status: 'Active',
+          clicksCount: 1420
+        },
+        {
+          id: 'notif-2',
+          title: 'Suspicious Offshore VPN Login Blocked',
+          body: 'WAF system has triggered an IP blacklist block for clients routing through high-risk geo-proxies. Secure authentication challenges are active.',
+          type: 'Critical Alert',
+          targetSegment: 'Admin Staff',
+          dispatchedAt: new Date(Date.now() - 3600000 * 8).toISOString().replace('T', ' ').substring(0, 19),
+          status: 'Active',
+          clicksCount: 88
+        },
+        {
+          id: 'notif-3',
+          title: 'Corporate Wire Standard Verification Rules',
+          body: 'Please remind high-net-worth commercial business accounts that outbound wires exceeding $150,000 necessitate second-officer signature matching.',
+          type: 'Info',
+          targetSegment: 'Business',
+          dispatchedAt: new Date(Date.now() - 3600000 * 24).toISOString().replace('T', ' ').substring(0, 19),
+          status: 'Active',
+          clicksCount: 345
+        },
+        {
+          id: 'notif-4',
+          title: 'Seasonal Higher Yield Savings Campaign Notice',
+          body: 'Promotional CD yield rates are live. Digital customer portals will display seasonal billboard banners with APY projections.',
+          type: 'Warning',
+          targetSegment: 'Personal',
+          dispatchedAt: new Date(Date.now() - 3600000 * 48).toISOString().replace('T', ' ').substring(0, 19),
+          status: 'Archived',
+          clicksCount: 1205
+        }
+      ];
     }
-  ]);
+    try {
+      return JSON.parse(raw);
+    } catch {
+      return [];
+    }
+  });
 
   const [notifFormTitle, setNotifFormTitle] = useState('');
   const [notifFormBody, setNotifFormBody] = useState('');
@@ -365,6 +416,14 @@ export const AdminPanel: React.FC = () => {
     setAuditLogs(getMockAuditLogs());
     setToggles(getMockToggles());
     setSystem(getMockSystem());
+    const rawNotifs = localStorage.getItem('lumina_admin_notifications_state');
+    if (rawNotifs) {
+      try {
+        setNotifications(JSON.parse(rawNotifs));
+      } catch (e) {
+        console.warn("Could not parse notifications state:", e);
+      }
+    }
   }, [activeTab]);
 
   // --- HELPER FOR PERMISSIONS CHECK ---
@@ -374,6 +433,17 @@ export const AdminPanel: React.FC = () => {
   };
 
   // --- ACTIONS ---
+
+  const handleBulkUpdateUserStatus = (newStatus: 'Active' | 'Suspended' | 'KYC Pending' | 'Pending') => {
+    if (!checkPermission('manageUsers')) {
+      alert("Permission Denied.");
+      return;
+    }
+    const updatedUsers = users.map(u => selectedUserIds.includes(u.id) ? { ...u, status: newStatus } : u);
+    setUsers(updatedUsers);
+    setSelectedUserIds([]);
+    syncWithStorage('users', updatedUsers, 'USER_BULK_STATUS_CHANGE', 'BULK', `Updated ${selectedUserIds.length} users to ${newStatus}`);
+  };
 
   // User Administration
   const handleToggleUserStatus = (userId: string) => {
@@ -544,6 +614,106 @@ export const AdminPanel: React.FC = () => {
     );
   };
 
+  const handleUpdateAccount = (accountNumber: string) => {
+    if (!checkPermission('manageAccounts')) {
+      alert("Permission Denied.");
+      return;
+    }
+    const bal = parseFloat(accModValue);
+    const rate = parseFloat(accModRate);
+    if (isNaN(bal) || isNaN(rate)) {
+      alert("Invalid balance or rate.");
+      return;
+    }
+
+    const updated = accounts.map(a => a.accountNumber === accountNumber ? {
+      ...a,
+      name: accModName,
+      email: accModEmail,
+      type: accModType,
+      balance: bal,
+      rate: rate
+    } : a);
+
+    setAccounts(updated);
+    setModifyingAccKey(null);
+    syncWithStorage('accounts', updated, 'ACCOUNT_UPDATE', accModEmail, `Updated account ${accountNumber}`);
+  };
+
+  const handleUpdateUser = (id: string) => {
+    if (!checkPermission('manageUsers')) {
+      alert("Permission Denied.");
+      return;
+    }
+    const bal = parseFloat(userModBalance);
+    if (isNaN(bal)) {
+      alert("Invalid balance.");
+      return;
+    }
+
+    const oldUser = users.find(u => u.id === id);
+    if (!oldUser) return;
+
+    const diff = Math.abs(bal - oldUser.balance);
+    if (diff > suspiciousThreshold) {
+      const newNotif: AdminNotification = {
+        id: `notif-${Date.now()}`,
+        title: 'Suspicious Balance Edit',
+        body: `User ${oldUser.email} balance modified from $${oldUser.balance.toFixed(2)} to $${bal.toFixed(2)}. Exceeds threshold of $${suspiciousThreshold.toLocaleString()}.`,
+        type: 'Critical Alert',
+        targetSegment: 'Admin Staff',
+        dispatchedAt: new Date().toISOString().replace('T', ' ').substring(0, 19),
+        status: 'Active',
+        clicksCount: 0
+      };
+      const updatedNotifs = [newNotif, ...notifications];
+      setNotifications(updatedNotifs);
+      setActiveToast({ title: newNotif.title, body: newNotif.body });
+      syncWithStorage(
+        'notifications_state',
+        updatedNotifs,
+        'SUSPICIOUS_BALANCE_EDIT',
+        oldUser.email,
+        `Flagged manual balance change of $${diff.toFixed(2)} beyond threshold of $${suspiciousThreshold}`
+      );
+    }
+
+    const updated = users.map(u => u.id === id ? { 
+      ...u, 
+      firstName: userModFirstName, 
+      lastName: userModLastName, 
+      email: userModEmail, 
+      role: userModRole, 
+      accountType: userModAccountType,
+      balance: bal,
+      status: userModStatus
+    } : u);
+    setUsers(updated);
+    setModifyingUserId(null);
+    syncWithStorage('users', updated, 'USER_UPDATE', userModEmail, `Modified user details for ${userModEmail}`);
+  };
+
+  const handleUpdateTransaction = (id: string) => {
+    if (!checkPermission('manageTransactions')) {
+      alert("Permission Denied.");
+      return;
+    }
+    const amt = parseFloat(txModAmount);
+    if (isNaN(amt)) {
+      alert("Invalid amount.");
+      return;
+    }
+    const updated = transactions.map(t => t.id === id ? { 
+      ...t, 
+      counterparty: txModCounterparty, 
+      amount: amt, 
+      status: txModStatus 
+    } : t);
+    setTransactions(updated);
+    setModifyingTxId(null);
+    syncWithStorage('transactions', updated, 'TRANSACTION_UPDATE', String(id), `Modified transaction details for ID: ${id}`);
+  };
+
   const handleToggleAccountFreeze = (accountNumber: string) => {
     if (!checkPermission('manageAccounts')) {
       alert("Permission Denied.");
@@ -568,7 +738,7 @@ export const AdminPanel: React.FC = () => {
   const handleCreateTransaction = (e: React.FormEvent) => {
     e.preventDefault();
     if (!checkPermission('manageTransactions')) {
-      alert("Permission Denied: Supervisor cannot seed manually simulated transaction records.");
+      alert("Permission Denied: Supervisor cannot seed manual transaction records.");
       return;
     }
     const amount = parseFloat(txAmount);
@@ -612,7 +782,7 @@ export const AdminPanel: React.FC = () => {
       updatedTxs,
       'TRANSACTION_SECURE_INJECT',
       txEmail,
-      `Simulated manual operational ${txType} entry of $${amount.toFixed(2)} with counterparty: ${txCounterparty}`
+      `Manual operational ${txType} entry of $${amount.toFixed(2)} with counterparty: ${txCounterparty}`
     );
   };
 
@@ -701,6 +871,68 @@ export const AdminPanel: React.FC = () => {
   };
 
   // Crypto Management
+  const handleUpdateCrypto = (address: string) => {
+    if (!checkPermission('manageCrypto')) {
+      alert("Permission Denied.");
+      return;
+    }
+    const bal = parseFloat(cryptoModBalance);
+    const fiat = parseFloat(cryptoModFiat);
+    if (isNaN(bal) || isNaN(fiat)) {
+      alert("Invalid balance or fiat values.");
+      return;
+    }
+
+    const updated = cryptoWallets.map(w => w.address === address ? {
+      ...w,
+      email: cryptoModEmail,
+      asset: cryptoModAsset,
+      balance: bal,
+      fiatValue: fiat
+    } : w);
+
+    setCryptoWallets(updated);
+    setModifyingCryptoAddress(null);
+    syncWithStorage('crypto', updated, 'CRYPTO_WALLET_UPDATE', cryptoModEmail, `Modified properties of hotwallet ${address}`);
+  };
+
+  const handleCreateCrypto = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!checkPermission('manageCrypto')) {
+      alert("Permission Denied.");
+      return;
+    }
+    if (!newCryptoEmail || !newCryptoAddress) {
+      alert("Please fill out required fields.");
+      return;
+    }
+    
+    const bal = parseFloat(newCryptoBalance || '0');
+    const fiat = parseFloat(newCryptoFiat || '0');
+    
+    const nextWallet: CryptoWallet = {
+      email: newCryptoEmail,
+      asset: newCryptoAsset,
+      address: newCryptoAddress,
+      balance: bal,
+      fiatValue: fiat,
+      status: 'Enabled'
+    };
+    
+    const updated = [nextWallet, ...cryptoWallets];
+    setCryptoWallets(updated);
+    setShowCreateCryptoForm(false);
+    
+    // reset form
+    setNewCryptoEmail('');
+    setNewCryptoAsset('BTC');
+    setNewCryptoAddress('');
+    setNewCryptoBalance('');
+    setNewCryptoFiat('');
+    
+    syncWithStorage('crypto', updated, 'CRYPTO_WALLET_CREATE', newCryptoEmail, `Provisioned new hotwallet address ${newCryptoAddress} for ${newCryptoAsset}`);
+  };
+
   const handleToggleSwapWalletStatus = (address: string) => {
     if (!checkPermission('manageCrypto')) {
       alert("Permission Denied.");
@@ -723,7 +955,7 @@ export const AdminPanel: React.FC = () => {
   };
 
   // Compliance & KYC approvals
-  const handleVerifyKyc = (kycId: string, docType: 'passport' | 'face' | 'utility', decision: 'Approved' | 'Rejected') => {
+  const handleVerifyKyc = (kycId: string, docType: 'passport' | 'face' | 'utility', decision: 'Approved' | 'Rejected' | 'Pending') => {
     if (!checkPermission('approveKyc')) {
       alert("Permission Denied: Supervisor compliance license restricted.");
       return;
@@ -766,7 +998,7 @@ export const AdminPanel: React.FC = () => {
   };
 
   // Bulk compliance KYC approval or rejection
-  const handleBulkKycVerify = (decision: 'Approved' | 'Rejected') => {
+  const handleBulkKycVerify = (decision: 'Approved' | 'Rejected' | 'Pending') => {
     if (!checkPermission('approveKyc')) {
       alert("Permission Denied: Supervisor compliance license restricted.");
       return;
@@ -1175,6 +1407,37 @@ export const AdminPanel: React.FC = () => {
 
   return (
     <div className="flex flex-col min-h-screen bg-white text-slate-900 antialiased -mt-0">
+      {/* REAL-TIME SYSTEM ALERTS TOASTER */}
+      {activeToast && (
+        <div className="fixed top-6 right-6 z-50 max-w-sm w-80 bg-rose-50 border-l-4 border-rose-500 shadow-xl rounded-lg p-4 animate-bounce flex gap-3 transition-all duration-300">
+          <div className="w-8 h-8 rounded-full bg-rose-100 flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-4 h-4 text-rose-600 animate-pulse" />
+          </div>
+          <div className="flex-1">
+            <div className="flex justify-between items-start">
+              <span className="text-xs font-bold text-rose-800 uppercase tracking-wider font-mono">CRITICAL VALUE FLAG</span>
+              <button onClick={() => setActiveToast(null)} className="text-slate-400 hover:text-slate-600 text-xs">✕</button>
+            </div>
+            <h4 className="text-xs font-extrabold text-slate-900 mt-1">{activeToast.title}</h4>
+            <p className="text-[11px] text-slate-700 mt-1 leading-relaxed">{activeToast.body}</p>
+            <div className="mt-2.5 flex justify-end gap-1">
+              <button 
+                onClick={() => { setActiveTab('notifications'); setActiveToast(null); }} 
+                className="bg-rose-600 text-white hover:bg-rose-700 text-[10px] font-bold px-2 py-1 rounded"
+              >
+                Inspect Logs
+              </button>
+              <button 
+                onClick={() => setActiveToast(null)} 
+                className="bg-slate-200 text-slate-700 hover:bg-slate-300 text-[10px] font-bold px-2 py-1 rounded"
+              >
+                Dismiss
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex-1 flex flex-col md:flex-row">
         {/* SIDE BAR NAVIGATION */}
         <aside className="w-full md:w-64 bg-slate-50 p-6 flex flex-col gap-6 border-r border-slate-200 shrink-0">
@@ -1230,7 +1493,7 @@ export const AdminPanel: React.FC = () => {
               className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium flex items-center gap-3 transition-colors ${activeTab === 'transactions' ? 'bg-emerald-600 text-white' : 'text-slate-700 hover:bg-white'}`}
             >
               <Activity className="w-4 h-4" />
-              <span>Simulated Transactions</span>
+              <span>Transactions</span>
               {totalFlaggedCount > 0 && <span className="ml-auto bg-amber-500 text-slate-950 font-bold text-xs h-5 px-1.5 flex items-center justify-center rounded">{totalFlaggedCount}</span>}
             </button>
 
@@ -1421,7 +1684,7 @@ export const AdminPanel: React.FC = () => {
                 <Card className="p-6 bg-slate-50 border-slate-200 md:col-span-2">
                   <div className="flex justify-between items-center mb-6">
                     <div>
-                      <h2 className="text-lg font-bold text-slate-900">Simulated Ledger Flow Vol</h2>
+                      <h2 className="text-lg font-bold text-slate-900">Ledger Flow Vol</h2>
                       <p className="text-slate-500 text-xs">Standard checking vs. corporate wires vs. instant crypto swaps</p>
                     </div>
                     <span className="text-xs font-medium text-emerald-600 font-mono">+12.4% avg daily increase</span>
@@ -1517,6 +1780,19 @@ export const AdminPanel: React.FC = () => {
                     
                     {/* Search / Filters block */}
                     <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                      {selectedUserIds.length > 0 && (
+                        <div className="bg-emerald-50 text-emerald-800 p-2 rounded flex items-center gap-4">
+                          <span className="text-xs font-bold">{selectedUserIds.length} selected</span>
+                          <select className="bg-white text-xs border border-emerald-200 rounded px-2 py-1" onChange={(e) => e.target.value && handleBulkUpdateUserStatus(e.target.value as any)}>
+                            <option value="">Status...</option>
+                            <option value="Active">Active</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Suspended">Suspended</option>
+                            <option value="KYC Pending">KYC Pending</option>
+                          </select>
+                        </div>
+                      )}
+                      
                       <div className="relative flex-grow md:flex-grow-0">
                         <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
                         <input 
@@ -1547,6 +1823,22 @@ export const AdminPanel: React.FC = () => {
                         <option value="Suspended">Suspended</option>
                         <option value="KYC Pending">KYC Pending</option>
                       </select>
+
+                      <div className="flex items-center gap-1 bg-white rounded border border-slate-200 px-2 py-1.5 text-xs">
+                        <span className="text-slate-500 font-medium whitespace-nowrap">Alert Limit:</span>
+                        <span className="text-slate-400">$</span>
+                        <input 
+                          type="number" 
+                          className="w-16 bg-transparent text-slate-800 focus:outline-none font-bold text-xs" 
+                          value={suspiciousThreshold} 
+                          onChange={(e) => {
+                            const val = parseFloat(e.target.value) || 0;
+                            setSuspiciousThreshold(val);
+                            localStorage.setItem('lumina_admin_suspicious_threshold', val.toString());
+                          }} 
+                          placeholder="10000"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -1555,6 +1847,13 @@ export const AdminPanel: React.FC = () => {
                     <table className="w-full text-left border-collapse text-xs">
                       <thead>
                         <tr className="border-b border-slate-200 text-slate-500 uppercase font-bold bg-white/30">
+                          <th className="py-3 px-4 w-10">
+                            <input 
+                              type="checkbox" 
+                              checked={selectedUserIds.length === filteredUsers.length && filteredUsers.length > 0}
+                              onChange={(e) => setSelectedUserIds(e.target.checked ? filteredUsers.map(u => u.id) : [])}
+                            />
+                          </th>
                           <th className="py-3 px-4">User Details</th>
                           <th className="py-3 px-4">Registry Email</th>
                           <th className="py-3 px-4">Signup Balance</th>
@@ -1564,8 +1863,61 @@ export const AdminPanel: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200">
-                        {filteredUsers.map((user) => (
+                        {filteredUsers.map((user) => modifyingUserId === user.id ? (
+                          <tr key={user.id} className="hover:bg-white/50 transition-colors bg-slate-50/50">
+                            <td className="py-3.5 px-4"><input type="checkbox" disabled /></td>
+                            <td className="py-3.5 px-4 font-semibold text-slate-900">
+                              <div className="flex gap-2">
+                                <input className="w-20 bg-white border border-slate-200 rounded px-2 py-1 text-xs" value={userModFirstName || ''} onChange={e => setUserModFirstName(e.target.value)} placeholder="First" />
+                                <input className="w-20 bg-white border border-slate-200 rounded px-2 py-1 text-xs" value={userModLastName || ''} onChange={e => setUserModLastName(e.target.value)} placeholder="Last" />
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4 text-slate-700 font-mono">
+                              <input className="w-full bg-white border border-slate-200 rounded px-2 py-1 text-xs" value={userModEmail || ''} onChange={e => setUserModEmail(e.target.value)} />
+                            </td>
+                            <td className="py-3.5 px-4 text-slate-700">
+                              <input type="number" className="w-24 bg-white border border-slate-200 rounded px-2 py-1 text-xs" value={userModBalance || ''} onChange={e => setUserModBalance(e.target.value)} />
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <div className="flex gap-1 flex-col xl:flex-row">
+                                <select className="bg-white border border-slate-200 rounded px-2 py-1 text-xs" value={userModRole || 'Admin'} onChange={e => setUserModRole(e.target.value as any)}>
+                                  <option value="Admin">Admin</option>
+                                  <option value="Compliance">Customer</option>
+                                </select>
+                                <select className="bg-white border border-slate-200 rounded px-2 py-1 text-xs" value={userModAccountType || 'Personal'} onChange={e => setUserModAccountType(e.target.value as any)}>
+                                  <option value="Personal">Personal</option>
+                                  <option value="Business">Business</option>
+                                </select>
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4">
+                              <select className="bg-white border border-slate-200 rounded px-2 py-1 text-xs" value={userModStatus || 'Active'} onChange={e => setUserModStatus(e.target.value as any)}>
+                                <option value="Active">Active</option>
+                                <option value="Pending">Pending</option>
+                                <option value="Suspended">Suspended</option>
+                                <option value="KYC Pending">KYC Pending</option>
+                              </select>
+                            </td>
+                            <td className="py-3.5 px-4 text-right flex items-center justify-end gap-1.5">
+                              <button onClick={() => handleUpdateUser(user.id)} className="text-emerald-500 hover:text-emerald-600" title="Save"><Check className="w-4 h-4" /></button>
+                              <button onClick={() => setModifyingUserId(null)} className="text-rose-500 hover:text-rose-600" title="Cancel"><XCircle className="w-4 h-4" /></button>
+                            </td>
+                          </tr>
+                        ) : (
                           <tr key={user.id} className="hover:bg-white/50 transition-colors">
+                            <td className="py-3.5 px-4">
+                              <input 
+                                type="checkbox" 
+                                checked={selectedUserIds.includes(user.id)}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedUserIds([...selectedUserIds, user.id]);
+                                  } else {
+                                    setSelectedUserIds(selectedUserIds.filter(id => id !== user.id));
+                                  }
+                                }}
+                              />
+                            </td>
                             <td className="py-3.5 px-4 font-semibold text-slate-900">
                               <div>
                                 {user.firstName} {user.lastName} 
@@ -1599,6 +1951,21 @@ export const AdminPanel: React.FC = () => {
                               </span>
                             </td>
                             <td className="py-3.5 px-4 text-right flex items-center justify-end gap-1.5">
+                              <button 
+                                onClick={() => {
+                                  setModifyingUserId(user.id);
+                                  setUserModFirstName(user.firstName);
+                                  setUserModLastName(user.lastName);
+                                  setUserModEmail(user.email);
+                                  setUserModRole(user.role);
+                                  setUserModAccountType(user.accountType);
+                                  setUserModBalance(user.balance.toString());
+                                  setUserModStatus(user.status);
+                                }}
+                                className="px-2 py-1 rounded text-[10px] font-bold border border-slate-300 bg-white text-slate-700 hover:bg-slate-200 transition-colors"
+                              >
+                                Edit
+                              </button>
                               <button 
                                 onClick={() => handleToggleUserStatus(user.id)}
                                 className={`px-3 py-1 text-[10px] font-bold rounded ring-1 transition-all ${
@@ -1763,25 +2130,34 @@ export const AdminPanel: React.FC = () => {
                           <div className="text-right">
                             <div className="text-base font-extrabold text-slate-900">
                               {modifyingAccKey === acc.accountNumber ? (
-                                <div className="flex gap-1.5 items-center">
-                                  <input 
-                                    type="text" 
-                                    className="bg-slate-50 text-slate-900 rounded border border-slate-200 px-2 py-1 text-xs w-24 text-right"
-                                    placeholder={acc.balance.toString()}
-                                    value={accModValue}
-                                    onChange={(e) => setAccModValue(e.target.value)}
-                                  />
-                                  <button onClick={() => handleUpdateAccountBalance(acc.accountNumber)} className="text-emerald-500 hover:text-emerald-600">
-                                    <Check className="w-4 h-4" />
-                                  </button>
-                                  <button onClick={() => setModifyingAccKey(null)} className="text-rose-500 hover:text-rose-600">
-                                    <XCircle className="w-4 h-4" />
-                                  </button>
+                                <div className="flex flex-col gap-1.5 items-end">
+                                  <input className="bg-slate-50 text-slate-900 rounded border border-slate-200 px-2 py-1 text-xs w-full" value={accModName || ''} onChange={e => setAccModName(e.target.value)} placeholder="Name" />
+                                  <input className="bg-slate-50 text-slate-900 rounded border border-slate-200 px-2 py-1 text-xs w-full" value={accModEmail || ''} onChange={e => setAccModEmail(e.target.value)} placeholder="Email" />
+                                  <div className="flex gap-1">
+                                    <select className="bg-slate-50 text-slate-900 rounded border border-slate-200 px-2 py-1 text-xs" value={accModType || 'Checking'} onChange={e => setAccModType(e.target.value as any)}>
+                                      <option value="Checking">Checking</option>
+                                      <option value="Savings">Savings</option>
+                                      <option value="Loan">Loan</option>
+                                    </select>
+                                    <input type="number" className="bg-slate-50 text-slate-900 rounded border border-slate-200 px-2 py-1 text-xs w-16" value={accModRate || ''} onChange={e => setAccModRate(e.target.value)} placeholder="Rate" />
+                                  </div>
+                                  <input type="number" className="bg-slate-50 text-slate-900 rounded border border-slate-200 px-2 py-1 text-xs w-24 text-right" value={accModValue || ''} onChange={e => setAccModValue(e.target.value)} placeholder="Balance" />
+                                  <div className="flex gap-1">
+                                    <button onClick={() => handleUpdateAccount(acc.accountNumber)} className="text-emerald-500 hover:text-emerald-600"><Check className="w-4 h-4" /></button>
+                                    <button onClick={() => setModifyingAccKey(null)} className="text-rose-500 hover:text-rose-600"><XCircle className="w-4 h-4" /></button>
+                                  </div>
                                 </div>
                               ) : (
                                 <div className="flex items-center gap-2 group">
                                   <span>${acc.balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                  <button onClick={() => { setModifyingAccKey(acc.accountNumber); setAccModValue(acc.balance.toString()); }} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-slate-900 transition-opacity">
+                                  <button onClick={() => { 
+                                    setModifyingAccKey(acc.accountNumber); 
+                                    setAccModValue(acc.balance.toString()); 
+                                    setAccModName(acc.name);
+                                    setAccModEmail(acc.email);
+                                    setAccModType(acc.type);
+                                    setAccModRate(acc.rate.toString()); 
+                                  }} className="opacity-0 group-hover:opacity-100 text-slate-500 hover:text-slate-900 transition-opacity">
                                     <Edit2 className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
@@ -1793,21 +2169,6 @@ export const AdminPanel: React.FC = () => {
                           </div>
 
                           <div className="flex gap-2">
-                            <Button 
-                              variant="outline" 
-                              className="px-2.5 py-1 text-[11px] h-8 bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700"
-                              onClick={() => {
-                                const nextRate = parseFloat(prompt(`Enter next standard yield APR (%) for account ${acc.accountNumber}:`, acc.rate.toString()) || "");
-                                if (!isNaN(nextRate)) {
-                                  const updated = accounts.map(a => a.accountNumber === acc.accountNumber ? { ...a, rate: nextRate } : a);
-                                  setAccounts(updated);
-                                  syncWithStorage('accounts', updated, 'ACCOUNT_RATE_ADJUST', acc.email, `Yield adjusted to ${nextRate}%`);
-                                }
-                              }}
-                            >
-                              Yield Adjust
-                            </Button>
-                            
                             <Button 
                               variant={acc.status === 'Open' ? 'outline' : 'secondary'}
                               className={`px-2.5 py-1 text-[11px] h-8 ${acc.status === 'Open' ? 'border-rose-200 bg-rose-50 text-rose-350 hover:bg-rose-100' : ''}`}
@@ -1827,7 +2188,7 @@ export const AdminPanel: React.FC = () => {
               <Card className="p-6 bg-slate-50 border-slate-200 h-fit">
                 <div className="mb-6">
                   <h3 className="text-lg font-bold text-slate-900">Manual Ledger Entry</h3>
-                  <p className="text-slate-500 text-xs">Simulate direct banking operations, wires, deposits, or custom credit adjustment logs.</p>
+                  <p className="text-slate-500 text-xs">Direct banking operations, wires, deposits, or custom credit adjustment logs.</p>
                 </div>
                 
                 <form onSubmit={handleCreateTransaction} className="space-y-4">
@@ -2169,52 +2530,92 @@ export const AdminPanel: React.FC = () => {
                               'text-slate-700 border border-slate-200 bg-white/50'
                             }`}>{tx.type}</span>
                           </td>
-                          <td className="py-3 px-4 text-slate-700 font-sans">{tx.counterparty}</td>
-                          <td className="py-3 px-4 text-slate-900 font-bold">${tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                          <td className="py-3 px-4">
-                            <span className={`inline-flex items-center gap-1 font-bold ${
-                              tx.status === 'Flagged' ? 'text-amber-600' :
-                              tx.status === 'Pending' ? 'text-blue-600' : 'text-emerald-600'
-                            }`}>
-                              {tx.status === 'Flagged' && <AlertTriangle className="w-3.5 h-3.5" />}
-                              {tx.status}
-                            </span>
-                          </td>
+                          {modifyingTxId === tx.id ? (
+                            <>
+                              <td className="py-3 px-4">
+                                <input className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded px-2 py-1 text-xs" value={txModCounterparty} onChange={e => setTxModCounterparty(e.target.value)} />
+                              </td>
+                              <td className="py-3 px-4">
+                                <input type="number" className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded px-2 py-1 text-xs" value={txModAmount} onChange={e => setTxModAmount(e.target.value)} />
+                              </td>
+                              <td className="py-3 px-4">
+                                <select className="w-full bg-slate-50 text-slate-900 border border-slate-200 rounded px-2 py-1 text-xs" value={txModStatus} onChange={e => setTxModStatus(e.target.value as any)}>
+                                  <option value="Cleared">Cleared</option>
+                                  <option value="Pending">Pending</option>
+                                  <option value="Flagged">Flagged</option>
+                                </select>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="py-3 px-4 text-slate-700 font-sans">{tx.counterparty}</td>
+                              <td className="py-3 px-4 text-slate-900 font-bold">${tx.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                              <td className="py-3 px-4">
+                                <span className={`inline-flex items-center gap-1 font-bold ${
+                                  tx.status === 'Flagged' ? 'text-amber-600' :
+                                  tx.status === 'Pending' ? 'text-blue-600' : 'text-emerald-600'
+                                }`}>
+                                  {tx.status === 'Flagged' && <AlertTriangle className="w-3.5 h-3.5" />}
+                                  {tx.status}
+                                </span>
+                              </td>
+                            </>
+                          )}
                           <td className="py-3 px-4 text-right font-sans">
-                            <div className="flex gap-1 justify-end">
-                              {tx.status === 'Cleared' ? (
-                                <button 
-                                  disabled
-                                  className="px-2 py-1 rounded text-[10px] font-bold border border-emerald-200/30 bg-emerald-100/10 text-emerald-600 cursor-not-allowed opacity-80"
-                                >
-                                  Suspension Cleared
-                                </button>
+                            <div className="flex gap-1 justify-end items-center">
+                              {modifyingTxId === tx.id ? (
+                                <>
+                                  <button onClick={() => handleUpdateTransaction(tx.id)} className="text-emerald-500 hover:text-emerald-600" title="Save"><Check className="w-4 h-4" /></button>
+                                  <button onClick={() => setModifyingTxId(null)} className="text-rose-500 hover:text-rose-600" title="Cancel"><XCircle className="w-4 h-4" /></button>
+                                </>
                               ) : (
-                                <button 
-                                  onClick={() => handleToggleFlagTransaction(tx.id)}
-                                  className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors ${
-                                    tx.status === 'Flagged' 
-                                      ? 'bg-white border-slate-300 hover:bg-slate-200 text-slate-700' 
-                                      : 'bg-amber-100 border-amber-300 text-amber-700 hover:bg-amber-900'
-                                  }`}
-                                >
-                                  {tx.status === 'Flagged' ? 'Clear Suspicion' : 'AML Hold'}
-                                </button>
-                              )}
+                                <>
+                                  <button 
+                                    onClick={() => {
+                                      setModifyingTxId(tx.id);
+                                      setTxModCounterparty(tx.counterparty);
+                                      setTxModAmount(tx.amount.toString());
+                                      setTxModStatus(tx.status);
+                                    }}
+                                    className="px-2 py-1 rounded text-[10px] font-bold border border-slate-300 bg-white text-slate-700 hover:bg-slate-200 transition-colors"
+                                  >
+                                    Edit
+                                  </button>
+                                  {tx.status === 'Cleared' ? (
+                                    <button 
+                                      disabled
+                                      className="px-2 py-1 rounded text-[10px] font-bold border border-emerald-200/30 bg-emerald-100/10 text-emerald-600 cursor-not-allowed opacity-80"
+                                    >
+                                      Suspension Cleared
+                                    </button>
+                                  ) : (
+                                    <button 
+                                      onClick={() => handleToggleFlagTransaction(tx.id)}
+                                      className={`px-2 py-1 rounded text-[10px] font-bold border transition-colors ${
+                                        tx.status === 'Flagged' 
+                                          ? 'bg-white border-slate-300 hover:bg-slate-200 text-slate-700' 
+                                          : 'bg-amber-100 border-amber-300 text-amber-700 hover:bg-amber-900'
+                                      }`}
+                                    >
+                                      {tx.status === 'Flagged' ? 'Clear Suspicion' : 'AML Hold'}
+                                    </button>
+                                  )}
 
-                              <button 
-                                onClick={() => {
-                                  if (confirm(`Proceed to reverse wire audit log ${tx.id}? This will safely deduct balances.`)) {
-                                    // Reverse the transaction by creating opposite entry
-                                    const reversedTxs = transactions.filter(t => t.id !== tx.id);
-                                    setTransactions(reversedTxs);
-                                    syncWithStorage('transactions', reversedTxs, 'TRANSACTION_REVERSAL_CLEAR', tx.email, `Reclaimed ${tx.amount} checking balances. Nullified audit ledger.`);
-                                  }
-                                }}
-                                className="px-2 py-1 rounded text-[10px] bg-rose-100 border border-rose-800 text-rose-350 font-bold hover:bg-rose-200 transition-colors"
-                              >
-                                Reverse
-                              </button>
+                                  <button 
+                                    onClick={() => {
+                                      if (confirm(`Proceed to reverse wire audit log ${tx.id}? This will safely deduct balances.`)) {
+                                        // Reverse the transaction by creating opposite entry
+                                        const reversedTxs = transactions.filter(t => t.id !== tx.id);
+                                        setTransactions(reversedTxs);
+                                        syncWithStorage('transactions', reversedTxs, 'TRANSACTION_REVERSAL_CLEAR', tx.email, `Reclaimed ${tx.amount} checking balances. Nullified audit ledger.`);
+                                      }
+                                    }}
+                                    className="px-2 py-1 rounded text-[10px] bg-rose-100 border border-rose-800 text-rose-350 font-bold hover:bg-rose-200 transition-colors"
+                                  >
+                                    Reverse
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -2235,14 +2636,99 @@ export const AdminPanel: React.FC = () => {
                     <h2 className="text-lg font-bold text-slate-900">Custodian Crypto Hotwallet Management</h2>
                     <p className="text-slate-500 text-xs">Verify multi-sig address mappings, alter transaction limits, and pause ledger conversions instantly.</p>
                   </div>
-                  <span className="text-xs bg-cyan-900/30 text-cyan-400 border border-cyan-800/40 px-2.5 py-1 rounded font-bold font-mono">GAS INDEX: 24 Gwei</span>
+                  <div className="flex items-center gap-3">
+                    <button onClick={() => setShowCreateCryptoForm(!showCreateCryptoForm)} className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded text-xs font-bold transition-colors">
+                      {showCreateCryptoForm ? 'Cancel' : '+ New Wallet'}
+                    </button>
+                    <span className="text-xs bg-cyan-900/30 text-cyan-400 border border-cyan-800/40 px-2.5 py-1 rounded font-bold font-mono">GAS INDEX: 24 Gwei</span>
+                  </div>
                 </div>
 
+                {showCreateCryptoForm && (
+                  <form onSubmit={handleCreateCrypto} className="mb-6 bg-white p-5 rounded-xl border border-emerald-200/50 relative">
+                    <h3 className="text-sm font-bold text-slate-900 mb-4">Provision Custodian Wallet</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5">Asset</label>
+                        <select className="w-full bg-slate-50 border border-slate-200 text-xs px-2 py-1.5 rounded" value={newCryptoAsset} onChange={e => setNewCryptoAsset(e.target.value)}>
+                          <option value="BTC">BTC</option>
+                          <option value="ETH">ETH</option>
+                          <option value="USDC">USDC</option>
+                          <option value="USDT">USDT</option>
+                        </select>
+                      </div>
+                      <div className="lg:col-span-2">
+                        <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5">Owner Email</label>
+                        <input className="w-full bg-slate-50 border border-slate-200 text-xs px-2 py-1.5 rounded" required placeholder="client@example.com" value={newCryptoEmail} onChange={e => setNewCryptoEmail(e.target.value)} />
+                      </div>
+                      <div className="lg:col-span-2">
+                        <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5">Address</label>
+                        <input className="w-full bg-slate-50 border border-slate-200 text-xs px-2 py-1.5 rounded font-mono" required placeholder="0x..." value={newCryptoAddress} onChange={e => setNewCryptoAddress(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5">Initial Balance</label>
+                        <input type="number" step="any" className="w-full bg-slate-50 border border-slate-200 text-xs px-2 py-1.5 rounded font-mono" value={newCryptoBalance} onChange={e => setNewCryptoBalance(e.target.value)} />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] uppercase font-bold text-slate-500 mb-1.5">Fiat Eq ($)</label>
+                        <input type="number" step="any" className="w-full bg-slate-50 border border-slate-200 text-xs px-2 py-1.5 rounded font-mono" value={newCryptoFiat} onChange={e => setNewCryptoFiat(e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="mt-4 flex justify-end">
+                      <button type="submit" className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-1.5 rounded text-xs font-bold transition-colors">
+                        Provision Wallet
+                      </button>
+                    </div>
+                  </form>
+                )}
+
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {cryptoWallets.map((wallet) => (
+                  {cryptoWallets.map((wallet) => modifyingCryptoAddress === wallet.address ? (
                     <div key={wallet.address} className="p-5 bg-white border border-slate-200 rounded-xl flex flex-col justify-between">
                       <div>
                         <div className="flex justify-between items-start mb-3">
+                          <select className="bg-slate-50 border border-slate-200 text-xs px-2 py-1 rounded" value={cryptoModAsset} onChange={e => setCryptoModAsset(e.target.value)}>
+                            <option value="BTC">BTC</option>
+                            <option value="ETH">ETH</option>
+                            <option value="USDC">USDC</option>
+                            <option value="USDT">USDT</option>
+                          </select>
+                          <div className="flex gap-1">
+                            <button onClick={() => handleUpdateCrypto(wallet.address)} className="text-emerald-500 hover:text-emerald-600"><Check className="w-4 h-4" /></button>
+                            <button onClick={() => setModifyingCryptoAddress(null)} className="text-rose-500 hover:text-rose-600"><XCircle className="w-4 h-4" /></button>
+                          </div>
+                        </div>
+                        <div className="text-xs text-slate-500 mt-2">Signatory client email:</div>
+                        <input className="w-full bg-slate-50 border border-slate-200 text-xs font-mono px-2 py-1 rounded" value={cryptoModEmail} onChange={e => setCryptoModEmail(e.target.value)} />
+                      </div>
+                      <div className="mt-5 pt-3 border-t border-slate-200 flex justify-between items-end gap-2">
+                        <div className="flex-1">
+                          <div className="text-slate-500 text-[10px]">Wallet Balance ({cryptoModAsset})</div>
+                          <input type="number" className="w-full bg-slate-50 border border-slate-200 text-lg font-bold font-mono px-2 py-1 rounded" value={cryptoModBalance} onChange={e => setCryptoModBalance(e.target.value)} />
+                        </div>
+                        <div className="flex-1 text-right">
+                          <div className="text-slate-405 text-[10px]">USD Value eq</div>
+                          <input type="number" className="w-full bg-slate-50 border border-slate-200 text-sm font-bold font-mono px-2 py-1 rounded text-right" value={cryptoModFiat} onChange={e => setCryptoModFiat(e.target.value)} />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div key={wallet.address} className="p-5 bg-white border border-slate-200 rounded-xl flex flex-col justify-between group relative">
+                      <button 
+                        onClick={() => {
+                          setModifyingCryptoAddress(wallet.address);
+                          setCryptoModEmail(wallet.email);
+                          setCryptoModAsset(wallet.asset);
+                          setCryptoModBalance(wallet.balance.toString());
+                          setCryptoModFiat(wallet.fiatValue.toString());
+                        }}
+                        className="absolute top-2 right-2 p-1.5 bg-slate-100 hover:bg-slate-200 text-slate-500 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Edit Wallet"
+                      >
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </button>
+                      <div>
+                        <div className="flex justify-between items-start mb-3 mr-8">
                           <span className={`px-2 py-0.5 rounded text-xs font-extrabold ${
                             wallet.asset === 'BTC' ? 'bg-amber-600/20 text-amber-600' :
                             wallet.asset === 'ETH' ? 'bg-indigo-600/20 text-indigo-600' : 'bg-green-600/20 text-green-400'
@@ -2275,7 +2761,7 @@ export const AdminPanel: React.FC = () => {
                         </div>
                         <div className="text-right">
                           <div className="text-slate-405 text-[10px]">USD Value eq</div>
-                          <div className="text-sm font-bold text-emerald-600 font-mono">${wallet.fiatValue.toLocaleString()}</div>
+                          <div className="text-sm font-bold text-emerald-600 font-mono">${wallet.fiatValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
                         </div>
                       </div>
                     </div>
@@ -2505,6 +2991,13 @@ export const AdminPanel: React.FC = () => {
                                 </button>
                                 <button
                                   type="button"
+                                  onClick={() => handleBulkKycVerify('Pending')}
+                                  className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded text-[11px] font-bold transition-all flex items-center gap-1 shadow-md"
+                                >
+                                  <Clock className="w-3.5 h-3.5" /> Bulk Pending
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={() => setSelectedKycIds([])}
                                   className="px-2.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded text-[11px] font-medium transition-all"
                                 >
@@ -2561,17 +3054,20 @@ export const AdminPanel: React.FC = () => {
                               <div className="grid grid-cols-3 gap-1.5 text-center mt-3 text-[10px]">
                                 <div className={`p-1.5 rounded font-semibold ${
                                   kyc.passportStatus === 'Approved' ? 'bg-emerald-100 text-emerald-600' : 
-                                  kyc.passportStatus === 'Rejected' ? 'bg-rose-100 text-rose-600' : 'bg-slate-50 text-slate-500'
+                                  kyc.passportStatus === 'Rejected' ? 'bg-rose-100 text-rose-600' : 
+                                  kyc.passportStatus === 'Pending' ? 'bg-amber-100 text-amber-600' : 'bg-slate-50 text-slate-500'
                                 }`}>Passport: {kyc.passportStatus}</div>
                                 
                                 <div className={`p-1.5 rounded font-semibold ${
                                   kyc.faceStatus === 'Approved' ? 'bg-emerald-100 text-emerald-600' : 
-                                  kyc.faceStatus === 'Rejected' ? 'bg-rose-100 text-rose-600' : 'bg-slate-50 text-slate-500'
+                                  kyc.faceStatus === 'Rejected' ? 'bg-rose-100 text-rose-600' : 
+                                  kyc.faceStatus === 'Pending' ? 'bg-amber-100 text-amber-600' : 'bg-slate-50 text-slate-500'
                                 }`}>Facial ID: {kyc.faceStatus}</div>
 
                                 <div className={`p-1.5 rounded font-semibold ${
                                   kyc.utilityStatus === 'Approved' ? 'bg-emerald-100 text-emerald-600' : 
-                                  kyc.utilityStatus === 'Rejected' ? 'bg-rose-100 text-rose-600' : 'bg-slate-50 text-slate-500'
+                                  kyc.utilityStatus === 'Rejected' ? 'bg-rose-100 text-rose-600' : 
+                                  kyc.utilityStatus === 'Pending' ? 'bg-amber-100 text-amber-600' : 'bg-slate-50 text-slate-500'
                                 }`}>Proof Res: {kyc.utilityStatus}</div>
                               </div>
                             </div>
@@ -2611,10 +3107,12 @@ export const AdminPanel: React.FC = () => {
                               <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold ${
                                 selectedKyc.passportStatus === 'Approved' ? 'bg-emerald-100 text-emerald-600 border border-emerald-200/30' :
                                 selectedKyc.passportStatus === 'Rejected' ? 'bg-rose-100 text-rose-600 border border-rose-200/30' :
+                                selectedKyc.passportStatus === 'Pending' ? 'bg-amber-100 text-amber-600 border border-amber-200/30' :
                                 'bg-white text-slate-500 border border-slate-200'
                               }`}>{selectedKyc.passportStatus}</span>
                             </div>
-                            <div className="flex items-center gap-1.5 self-end sm:self-auto">
+
+                        <div className="flex items-center gap-1.5 self-end sm:self-auto">
                               {selectedKyc.passportStatus !== 'Approved' && (
                                 <button
                                   type="button"
@@ -2633,6 +3131,15 @@ export const AdminPanel: React.FC = () => {
                                   <XCircle className="w-3 h-3" /> Reject
                                 </button>
                               )}
+                              {selectedKyc.passportStatus !== 'Pending' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleVerifyKyc(selectedKyc.id, 'passport', 'Pending')}
+                                  className="px-2.5 py-1 bg-amber-50/80 hover:bg-amber-200 text-amber-600 rounded text-[10px] font-bold border border-amber-200/30 transition-all flex items-center gap-1"
+                                >
+                                  <Clock className="w-3 h-3" /> Pending
+                                </button>
+                              )}
                             </div>
                           </div>
 
@@ -2643,6 +3150,7 @@ export const AdminPanel: React.FC = () => {
                               <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold ${
                                 selectedKyc.faceStatus === 'Approved' ? 'bg-emerald-100 text-emerald-600 border border-emerald-200/30' :
                                 selectedKyc.faceStatus === 'Rejected' ? 'bg-rose-50 text-rose-600 border border-rose-200/30' :
+                                selectedKyc.faceStatus === 'Pending' ? 'bg-amber-50 text-amber-600 border border-amber-200/30' :
                                 'bg-white text-slate-500 border border-slate-200'
                               }`}>{selectedKyc.faceStatus}</span>
                             </div>
@@ -2665,6 +3173,15 @@ export const AdminPanel: React.FC = () => {
                                   <XCircle className="w-3 h-3" /> Reject
                                 </button>
                               )}
+                              {selectedKyc.faceStatus !== 'Pending' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleVerifyKyc(selectedKyc.id, 'face', 'Pending')}
+                                  className="px-2.5 py-1 bg-amber-50/80 hover:bg-amber-200 text-amber-600 rounded text-[10px] font-bold border border-amber-200/30 transition-all flex items-center gap-1"
+                                >
+                                  <Clock className="w-3 h-3" /> Pending
+                                </button>
+                              )}
                             </div>
                           </div>
 
@@ -2675,6 +3192,7 @@ export const AdminPanel: React.FC = () => {
                               <span className={`inline-block mt-1 px-2 py-0.5 rounded text-[10px] font-bold ${
                                 selectedKyc.utilityStatus === 'Approved' ? 'bg-emerald-100 text-emerald-600 border border-emerald-200/30' :
                                 selectedKyc.utilityStatus === 'Rejected' ? 'bg-rose-50 text-rose-600 border border-rose-200/30' :
+                                selectedKyc.utilityStatus === 'Pending' ? 'bg-amber-50 text-amber-600 border border-amber-200/30' :
                                 'bg-white text-slate-500 border border-slate-200'
                               }`}>{selectedKyc.utilityStatus}</span>
                             </div>
@@ -2697,11 +3215,20 @@ export const AdminPanel: React.FC = () => {
                                   <XCircle className="w-3 h-3" /> Reject
                                 </button>
                               )}
+                              {selectedKyc.utilityStatus !== 'Pending' && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleVerifyKyc(selectedKyc.id, 'utility', 'Pending')}
+                                  className="px-2.5 py-1 bg-amber-50/80 hover:bg-amber-200 text-amber-600 rounded text-[10px] font-bold border border-amber-200/30 transition-all flex items-center gap-1"
+                                >
+                                  <Clock className="w-3 h-3" /> Pending
+                                </button>
+                              )}
                             </div>
                           </div>
 
                           {/* Quick Bulk Action Buttons */}
-                          <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 mt-4">
+                          <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-100 mt-4">
                             <button
                               type="button"
                               onClick={() => {
@@ -2709,7 +3236,7 @@ export const AdminPanel: React.FC = () => {
                                 handleVerifyKyc(selectedKyc.id, 'face', 'Approved');
                                 handleVerifyKyc(selectedKyc.id, 'utility', 'Approved');
                               }}
-                              className="py-2 bg-emerald-600 hover:bg-emerald-500 text-slate-950 rounded text-xs font-bold transition-all flex items-center justify-center gap-1 shadow-md shadow-emerald-600/10"
+                              className="py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-xs font-bold transition-all flex items-center justify-center gap-1 shadow-md shadow-emerald-600/10"
                             >
                               <CheckCircle className="w-3.5 h-3.5" /> Approve All
                             </button>
@@ -2723,6 +3250,17 @@ export const AdminPanel: React.FC = () => {
                               className="py-2 bg-rose-50 hover:bg-rose-200 text-rose-600 rounded text-xs font-bold border border-rose-200/40 transition-all flex items-center justify-center gap-1 shadow-md"
                             >
                               <XCircle className="w-3.5 h-3.5" /> Reject All
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                handleVerifyKyc(selectedKyc.id, 'passport', 'Pending');
+                                handleVerifyKyc(selectedKyc.id, 'face', 'Pending');
+                                handleVerifyKyc(selectedKyc.id, 'utility', 'Pending');
+                              }}
+                              className="py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 rounded text-xs font-bold border border-amber-600/40 transition-all flex items-center justify-center gap-1 shadow-md"
+                            >
+                              <Clock className="w-3.5 h-3.5" /> Pending All
                             </button>
                           </div>
                         </div>
@@ -3000,7 +3538,7 @@ export const AdminPanel: React.FC = () => {
                   
                   <button
                     onClick={() => {
-                      if (confirm("Are you sure you want to clear/refresh simulated audit trails? This is logged as a security action.")) {
+                      if (confirm("Are you sure you want to clear/refresh audit trails? This is logged as a security action.")) {
                         setAuditLogs([
                           {
                             id: `LOG-${Math.floor(1000 + Math.random() * 9000)}`,
@@ -3009,7 +3547,7 @@ export const AdminPanel: React.FC = () => {
                             role: activeSupervisor.role,
                             action: 'AUDIT_LOGS_REFRESH',
                             target: 'System Audit Db',
-                            details: 'Synchronized and flushed local database cache logs. Simulated hot state reload.',
+                            details: 'Synchronized and flushed local database cache logs. Hot state reload.',
                             ipAddress: '127.0.0.1'
                           }
                         ]);
@@ -3191,7 +3729,7 @@ export const AdminPanel: React.FC = () => {
                       type="submit"
                       className="px-5 py-2 rounded-lg bg-amber-500 text-slate-950 hover:bg-amber-400 font-bold text-xs flex items-center gap-1.5 shadow-md shadow-amber-500/10 hover:shadow-amber-500/25 transition-all"
                     >
-                      <Send className="w-3.5 h-3.5" /> Dispatch Simulated Broadcast
+                      <Send className="w-3.5 h-3.5" /> Dispatch Broadcast
                     </button>
                   </div>
                 </form>
@@ -3201,7 +3739,7 @@ export const AdminPanel: React.FC = () => {
               <Card className="p-6 bg-slate-50 border-slate-200">
                 <div className="mb-4 text-center">
                   <h3 className="text-xs font-bold text-slate-500 uppercase tracking-widest font-mono">Mobile App Viewport Preview</h3>
-                  <p className="text-[10px] text-slate-500 mt-1">Live customer terminal viewport simulation</p>
+                  <p className="text-[10px] text-slate-500 mt-1">Live customer terminal viewport</p>
                 </div>
 
                 {/* Simulated Device Container */}
@@ -3615,7 +4153,7 @@ export const LiveMarketTicker: React.FC = () => {
                 {isUp ? '+' : ''}{priceDiff.toFixed(activeAsset.decimals)} ({isUp ? '+' : ''}{percentDiff.toFixed(3)}%)
               </span>
             </div>
-            <p className="text-[10px] text-slate-500 mt-1">Updated 2.5 seconds ago (Simulation active)</p>
+            <p className="text-[10px] text-slate-500 mt-1">Updated 2.5 seconds ago (Active)</p>
           </div>
           
           {/* List of collateral minor currencies/stocks */}
