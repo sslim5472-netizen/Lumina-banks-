@@ -239,6 +239,8 @@ export const AdminPanel: React.FC = () => {
   const [newCustFirstName, setNewCustFirstName] = useState('');
   const [newCustLastName, setNewCustLastName] = useState('');
   const [newCustEmail, setNewCustEmail] = useState('');
+  const [newCustPassword, setNewCustPassword] = useState('');
+  const [newCustConfirmPassword, setNewCustConfirmPassword] = useState('');
   const [newCustAccountType, setNewCustAccountType] = useState<'Personal' | 'Business'>('Personal');
   const [newCustRole, setNewCustRole] = useState<'Admin' | 'Compliance' | 'Editor' | 'Developer'>('Compliance');
   const [newCustStatus, setNewCustStatus] = useState<'Active' | 'Suspended' | 'KYC Pending' | 'Pending'>('Active');
@@ -435,6 +437,95 @@ export const AdminPanel: React.FC = () => {
 
   // --- ACTIONS ---
 
+  const handleClearUsersOnly = () => {
+    if (!confirm("Are you sure you want to permanently delete ALL users and their associated accounts? The directory will be entirely empty.")) {
+      return;
+    }
+    setUsers([]);
+    saveAdminStore('users', []);
+    
+    // Also clear associated accounts/wallets
+    setAccounts([]);
+    saveAdminStore('accounts', []);
+    setCryptoWallets([]);
+    saveAdminStore('crypto', []);
+    
+    syncWithStorage('users', [], 'USER_PURGE', 'SYSTEM', 'Performed complete system-wide purge of all user registry and bank accounts.');
+    setSelectedUserIds([]);
+  };
+
+  const handleApproveUser = (userId: string) => {
+    if (!checkPermission('manageUsers')) {
+      alert("Permission Denied.");
+      return;
+    }
+    const targetUser = users.find(u => u.id === userId);
+    if (!targetUser) return;
+
+    const updatedUsers = users.map(u => u.id === userId ? { ...u, status: 'Active' as const } : u);
+    setUsers(updatedUsers);
+    
+    // Also create their initial account if it doesn't exist
+    const userAcc = accounts.find(a => a.email === targetUser.email);
+    if (!userAcc) {
+      const newAccNumber = Math.floor(100000000 + Math.random() * 900000000).toString();
+      const nextAcc: AdminAccount = {
+        accountNumber: newAccNumber,
+        email: targetUser.email,
+        name: `${targetUser.firstName} ${targetUser.lastName} Standard Checking`,
+        type: 'Checking',
+        balance: targetUser.balance || 0,
+        rate: 0.15,
+        overdraftAllowed: targetUser.accountType === 'Business',
+        status: 'Open'
+      };
+      const updatedAccounts = [nextAcc, ...accounts];
+      setAccounts(updatedAccounts);
+      saveAdminStore('accounts', updatedAccounts);
+    }
+    
+    syncWithStorage('users', updatedUsers, 'USER_APPROVE', targetUser.email, `Approved user registration for ${targetUser.email}. status set to Active.`);
+  };
+
+  const handleClearGlobalData = () => {
+    if (!confirm("CRITICAL ACTION: Are you sure you want to permanently WIPE all core ledger data, user registries, and audit logs? This will reset the system to initial seed state.")) {
+      return;
+    }
+    
+    // Clear all lumina_admin keys
+    const keysToClear = [
+      'users', 'accounts', 'transactions', 'crypto', 'kyc', 'tickets', 
+      'announcements', 'auditLogs', 'security', 'toggles', 'system', 'permissions',
+      'notifications_state'
+    ];
+    
+    keysToClear.forEach(k => localStorage.removeItem(`lumina_admin_${k}`));
+    
+    // Re-initialize
+    initializeMockDatabase();
+    
+    // Refresh states
+    setUsers(getMockUsers());
+    setAccounts(getMockAccounts());
+    setTransactions(getMockTransactions());
+    setCryptoWallets(getMockCrypto());
+    setKycSubmissions(getMockKyc());
+    setTickets(getMockTickets());
+    setAnnouncements(getMockAnnouncements());
+    setAuditLogs(getMockAuditLogs());
+    setToggles(getMockToggles());
+    setSystem(getMockSystem());
+    setNotifications([]);
+    
+    alert("System database has been reset to factory defaults.");
+    // Stay on current view to see changes
+    if (activeTab === 'users') {
+      setSelectedUserIds([]);
+    } else {
+      setActiveTab('overview');
+    }
+  };
+
   const handleBulkUpdateUserStatus = (newStatus: 'Active' | 'Suspended' | 'KYC Pending' | 'Pending') => {
     if (!checkPermission('manageUsers')) {
       alert("Permission Denied.");
@@ -489,15 +580,26 @@ export const AdminPanel: React.FC = () => {
     const targetUser = users.find(u => u.id === userId);
     if (!targetUser) return;
     
-    if (confirm(`Are you sure you want to permanently delete user ${targetUser.firstName} ${targetUser.lastName} (${targetUser.email})? This and their general operations role will be restricted.`)) {
+    if (confirm(`Are you sure you want to permanently delete user ${targetUser.firstName} ${targetUser.lastName} (${targetUser.email})? This will also remove any associated bank account records and crypto hotwallets.`)) {
       const updatedUsers = users.filter(u => u.id !== userId);
       setUsers(updatedUsers);
+      
+      // Also delete associated accounts
+      const updatedAccounts = accounts.filter(a => a.email !== targetUser.email);
+      setAccounts(updatedAccounts);
+      saveAdminStore('accounts', updatedAccounts);
+
+      // Also delete crypto wallets
+      const updatedCrypto = cryptoWallets.filter(w => w.email !== targetUser.email);
+      setCryptoWallets(updatedCrypto);
+      saveAdminStore('crypto', updatedCrypto);
+
       syncWithStorage(
         'users',
         updatedUsers,
         'USER_DELETE',
         targetUser.email,
-        `Permanently removed user registry record for ${targetUser.firstName} ${targetUser.lastName}.`
+        `Permanently removed user registry record for ${targetUser.firstName} ${targetUser.lastName} and all associated ledger accounts.`
       );
     }
   };
@@ -508,8 +610,13 @@ export const AdminPanel: React.FC = () => {
       alert("Permission Denied: Supervisor role does not support registering new core directory entries.");
       return;
     }
-    if (!newCustFirstName || !newCustLastName || !newCustEmail) {
-      alert("First Name, Last Name, and Email are required.");
+    if (!newCustFirstName || !newCustLastName || !newCustEmail || !newCustPassword) {
+      alert("First Name, Last Name, Email, and Password are required.");
+      return;
+    }
+
+    if (newCustPassword !== newCustConfirmPassword) {
+      alert("Passwords do not match.");
       return;
     }
 
@@ -520,6 +627,7 @@ export const AdminPanel: React.FC = () => {
       firstName: newCustFirstName,
       lastName: newCustLastName,
       email: newCustEmail,
+      password: newCustPassword,
       accountType: newCustAccountType,
       role: newCustRole,
       status: newCustStatus,
@@ -569,6 +677,8 @@ export const AdminPanel: React.FC = () => {
     setNewCustFirstName('');
     setNewCustLastName('');
     setNewCustEmail('');
+    setNewCustPassword('');
+    setNewCustConfirmPassword('');
     setNewCustBalance('');
     setNewCustAccountType('Personal');
     setNewCustRole('Compliance');
@@ -1842,10 +1952,62 @@ export const AdminPanel: React.FC = () => {
                     {/* Search / Filters block */}
                     <div className="flex flex-wrap gap-2 w-full md:w-auto">
                       {selectedUserIds.length > 0 && (
-                        <div className="bg-emerald-50 text-emerald-800 p-2 rounded flex items-center gap-4">
+                        <div className="bg-emerald-50 text-emerald-800 p-2 rounded flex items-center gap-2">
                           <span className="text-xs font-bold">{selectedUserIds.length} selected</span>
-                          <select className="bg-white text-xs border border-emerald-200 rounded px-2 py-1" onChange={(e) => e.target.value && handleBulkUpdateUserStatus(e.target.value as any)}>
-                            <option value="">Status...</option>
+                          <button 
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (confirm(`Approve registration for ${selectedUserIds.length} selected users?`)) {
+                                const updatedUsers = users.map(u => selectedUserIds.includes(u.id) ? { ...u, status: 'Active' as const } : u);
+                                setUsers(updatedUsers);
+                                syncWithStorage('users', updatedUsers, 'USER_BULK_APPROVE', 'BULK', `Bulk approved ${selectedUserIds.length} registration entries.`);
+                                setSelectedUserIds([]);
+                              }
+                            }}
+                            className="bg-emerald-600 text-white rounded px-3 py-1.5 text-xs font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1.5 shadow-sm active:scale-95"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            Approve
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (confirm(`CRITICAL: Permanently remove ${selectedUserIds.length} selected records and ALL associated financial accounts?`)) {
+                                const selectedEmails = users.filter(u => selectedUserIds.includes(u.id)).map(u => u.email);
+                                const updatedUsers = users.filter(u => !selectedUserIds.includes(u.id));
+                                setUsers(updatedUsers);
+                                
+                                // Bulk cleanup
+                                const updatedAccounts = accounts.filter(a => !selectedEmails.includes(a.email));
+                                setAccounts(updatedAccounts);
+                                saveAdminStore('accounts', updatedAccounts);
+
+                                const updatedCrypto = cryptoWallets.filter(w => !selectedEmails.includes(w.email));
+                                setCryptoWallets(updatedCrypto);
+                                saveAdminStore('crypto', updatedCrypto);
+
+                                syncWithStorage('users', updatedUsers, 'USER_BULK_DELETE', 'BULK', `Permanently removed ${selectedUserIds.length} registry entries and their associated accounts.`);
+                                setSelectedUserIds([]);
+                              }
+                            }}
+                            className="bg-rose-600 text-white rounded px-3 py-1.5 text-xs font-bold hover:bg-rose-700 transition-colors flex items-center gap-1.5 shadow-sm active:scale-95"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            Delete
+                          </button>
+                          <select 
+                            className="bg-white text-xs border border-emerald-200 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-emerald-400" 
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val) {
+                                handleBulkUpdateUserStatus(val as any);
+                                e.target.value = "";
+                              }
+                            }}
+                          >
+                            <option value="">Set Status...</option>
                             <option value="Active">Active</option>
                             <option value="Pending">Pending</option>
                             <option value="Suspended">Suspended</option>
@@ -1885,7 +2047,7 @@ export const AdminPanel: React.FC = () => {
                         <option value="KYC Pending">KYC Pending</option>
                       </select>
 
-                      <div className="flex items-center gap-1 bg-white rounded border border-slate-200 px-2 py-1.5 text-xs">
+                      <div className="flex items-center gap-1 bg-white rounded border border-slate-200 px-2 py-1.5 text-xs h-8">
                         <span className="text-slate-500 font-medium whitespace-nowrap">Alert Limit:</span>
                         <span className="text-slate-400">$</span>
                         <input 
@@ -1900,6 +2062,19 @@ export const AdminPanel: React.FC = () => {
                           placeholder="10000"
                         />
                       </div>
+
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handleClearUsersOnly();
+                        }}
+                        className="bg-rose-600 hover:bg-rose-700 text-white px-3 py-1.5 rounded text-xs font-bold transition-all flex items-center gap-1.5 h-8 shadow-sm active:scale-95"
+                        title="Delete all user records from system"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Clear All
+                      </button>
                     </div>
                   </div>
 
@@ -2037,12 +2212,25 @@ export const AdminPanel: React.FC = () => {
                               >
                                 {user.status === 'Suspended' ? 'Reinstate' : 'Suspend'}
                               </button>
+                              {(user.status === 'Pending' || user.status === 'KYC Pending') && (
+                                <button 
+                                  onClick={() => handleApproveUser(user.id)}
+                                  className="px-2 py-1 text-[10px] font-bold rounded ring-1 bg-emerald-500/20 text-emerald-600 ring-emerald-500/30 hover:bg-emerald-500/30 transition-all"
+                                  title="Approve User Registration"
+                                >
+                                  Approve
+                                </button>
+                              )}
                               <button 
-                                onClick={() => handleDeleteUser(user.id)}
-                                className="px-2 py-1 text-[10px] font-bold rounded ring-1 bg-red-950/40 text-rose-600 ring-red-900/60 hover:bg-red-900/50 transition-all flex items-center gap-1"
+                                type="button"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  handleDeleteUser(user.id);
+                                }}
+                                className="px-2 py-1 text-[10px] font-bold rounded bg-rose-600 text-white hover:bg-rose-700 transition-all flex items-center gap-1 shadow-sm active:scale-95"
                                 title="Delete User Permanently"
                               >
-                                <Trash2 className="w-3 h-3 text-rose-600" />
+                                <Trash2 className="w-3 h-3" />
                                 <span>Delete</span>
                               </button>
                             </td>
@@ -2096,6 +2284,27 @@ export const AdminPanel: React.FC = () => {
                       required
                       className="bg-white border-slate-200 text-slate-900 sm:text-xs"
                     />
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <Input
+                        label="Account Password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={newCustPassword || ''}
+                        onChange={(e) => setNewCustPassword(e.target.value)}
+                        required
+                        className="bg-white border-slate-200 text-slate-900 sm:text-xs"
+                      />
+                      <Input
+                        label="Confirm Password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={newCustConfirmPassword || ''}
+                        onChange={(e) => setNewCustConfirmPassword(e.target.value)}
+                        required
+                        className="bg-white border-slate-200 text-slate-900 sm:text-xs"
+                      />
+                    </div>
 
                     <div className="grid grid-cols-2 gap-3">
                       <Select
@@ -4047,6 +4256,22 @@ export const AdminPanel: React.FC = () => {
                     >
                       {system.maintenanceMode ? 'Restore Live' : 'Lock Sandbox'}
                     </button>
+                  </div>
+
+                  <div className="pt-6 border-t border-slate-200 mt-6 overflow-hidden">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                      <div>
+                        <h4 className="text-sm font-bold text-slate-900">Database Core Operations</h4>
+                        <p className="text-[10px] text-slate-500">Purge mock storage registries and reset the simulation to seed state.</p>
+                      </div>
+                      <Button 
+                        onClick={handleClearGlobalData}
+                        variant="outline" 
+                        className="border-rose-200 text-rose-300 hover:bg-rose-50 px-4 h-9 text-xs font-black bg-rose-950/20"
+                      >
+                         WIPE ALL MOCK DATA
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </Card>

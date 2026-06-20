@@ -3,6 +3,7 @@ import { Button, Input, Card } from '../components/UI';
 import { Lock, ShieldCheck, AlertCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { getSupabase } from '../supabaseClient';
+import { AdminUser } from '../utils/adminMockStore';
 
 export const Login: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -49,6 +50,42 @@ export const Login: React.FC = () => {
         return;
       }
 
+      // Intercept login for users created in Admin Panel (Mock Database)
+      try {
+        const rawUsers = localStorage.getItem('lumina_admin_users');
+        if (rawUsers) {
+          const mockUsers: AdminUser[] = JSON.parse(rawUsers);
+          const foundUser = mockUsers.find((u) => u.email.toLowerCase() === email.toLowerCase() && u.password === password);
+          
+          if (foundUser) {
+            // Check status
+            if (foundUser.status === 'Suspended') {
+              throw new Error("Your account has been suspended. Please contact support.");
+            }
+            
+            // Store simulated session
+            localStorage.setItem('lumina_session', JSON.stringify({
+              email: foundUser.email,
+              role: foundUser.role,
+              name: `${foundUser.firstName} ${foundUser.lastName}`
+            }));
+
+            // Navigate based on role
+            if (foundUser.role === 'Admin') {
+              navigate('/admin');
+            } else {
+              navigate('/'); 
+            }
+            return;
+          }
+        }
+      } catch (e: unknown) {
+        if (e instanceof Error && e.message.includes("suspended")) {
+          throw e;
+        }
+        console.warn("Mock login check failed, falling back to Supabase:", e);
+      }
+
       const { data, error } = await getSupabase().auth.signInWithPassword({
         email,
         password,
@@ -57,11 +94,12 @@ export const Login: React.FC = () => {
       if (error) throw error;
 
       if (data.session) {
-        navigate('/dashboard');
+        navigate('/');
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Login error:', error);
-      setErrorMsg(error.message || "An unexpected error occurred during login.");
+      const msg = error instanceof Error ? error.message : "An unexpected error occurred during login.";
+      setErrorMsg(msg);
     } finally {
       setIsLoading(false);
     }

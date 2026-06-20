@@ -82,6 +82,26 @@ app.post("/api/otp/verify", async (req, res) => {
   res.json({ message: "OTP verified" });
 });
 
+// Automated Security Invalidation: Purge expired OTPs from database every minute
+if (supabase) {
+  setInterval(async () => {
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from("otps")
+        .delete()
+        .lt("expires_at", now);
+      
+      if (error) {
+        console.warn("[Security] Background OTP cleanup notice:", error.message);
+      }
+    } catch (err) {
+      // Fail silently in logs to prevent noise, but log connection issues
+      console.warn("[Security] Cleanup task connection dormant.");
+    }
+  }, 60000); // 60s interval
+}
+
 // Vite middleware
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {

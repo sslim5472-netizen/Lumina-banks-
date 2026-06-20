@@ -52,7 +52,49 @@ export const OpenAccount: React.FC = () => {
 
   const handleSubmit = () => {
     setIsSubmitting(true);
+    
+    // Simulate API call and save to local storage for Admin Panel visibility
     setTimeout(() => {
+      const newUser = {
+        id: `usr-${Date.now()}`,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        password: formData.password || 'TemporaryPassword123!', // Ensure a fallback
+        accountType: accountType === 'Personal' ? 'Personal' : 'Business',
+        role: 'Compliance', // Standard customer role
+        status: 'Pending', // Initial status requiring admin approval
+        createdDate: new Date().toISOString().split('T')[0],
+        balance: 0
+      };
+
+      const newKyc = {
+        id: `kyc-${Date.now()}`,
+        email: formData.email,
+        name: `${formData.firstName} ${formData.lastName}`,
+        submittedDate: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        passportUrl: 'https://placeholder.pics/svg/400x250/f1f5f9/64748b/Passport-Uploaded',
+        selfieUrl: 'https://placeholder.pics/svg/300x300/f1f5f9/64748b/Selfie-Uploaded',
+        utilityBillUrl: 'https://placeholder.pics/svg/400x500/f1f5f9/64748b/UtilityBill-Uploaded',
+        passportStatus: 'Pending',
+        faceStatus: 'Pending',
+        utilityStatus: 'Pending',
+        notes: 'User self-registered via public Open Account portal.'
+      };
+
+      // Persistence
+      try {
+        const rawUsers = localStorage.getItem('lumina_admin_users');
+        const users = rawUsers ? JSON.parse(rawUsers) : [];
+        localStorage.setItem('lumina_admin_users', JSON.stringify([newUser, ...users]));
+
+        const rawKyc = localStorage.getItem('lumina_admin_kyc');
+        const kycList = rawKyc ? JSON.parse(rawKyc) : [];
+        localStorage.setItem('lumina_admin_kyc', JSON.stringify([newKyc, ...kycList]));
+      } catch (e) {
+        console.error("Failed to persist signup data:", e);
+      }
+
       setIsSubmitting(false);
       setIsSuccess(true);
     }, 2000);

@@ -3,6 +3,7 @@ export interface AdminUser {
   firstName: string;
   lastName: string;
   email: string;
+  password?: string;
   accountType: 'Personal' | 'Business';
   role: 'Admin' | 'Compliance' | 'Editor' | 'Developer';
   status: 'Active' | 'Suspended' | 'KYC Pending' | 'Pending';
@@ -125,12 +126,12 @@ export interface SystemSettings {
 
 // Default Seed Data
 const initialUsers: AdminUser[] = [
-  { id: 'usr-1', firstName: 'Sarah', lastName: 'Jenkins', email: 'sarah.j@gmail.com', accountType: 'Personal', role: 'Compliance', status: 'Active', createdDate: '2026-01-15', balance: 45290.50 },
-  { id: 'usr-2', firstName: 'Michael', lastName: 'Chen', email: 'mchen.biz@work.com', accountType: 'Business', role: 'Admin', status: 'Active', createdDate: '2025-11-04', balance: 189400.00 },
-  { id: 'usr-3', firstName: 'Emily', lastName: 'Rodriguez', email: 'emily.rod@outlook.com', accountType: 'Personal', role: 'Editor', status: 'Active', createdDate: '2026-03-22', balance: 5200.25 },
-  { id: 'usr-4', firstName: 'Alex', lastName: 'Kaufman', email: 'kaufman.alex@gmail.com', accountType: 'Personal', role: 'Developer', status: 'KYC Pending', createdDate: '2026-06-18', balance: 1250.00 },
-  { id: 'usr-5', firstName: 'Jordan', lastName: 'Blake', email: 'jordanb@techcorp.io', accountType: 'Business', role: 'Admin', status: 'Suspended', createdDate: '2025-05-12', balance: 87500.00 },
-  { id: 'usr-6', firstName: 'Elena', lastName: 'Petrova', email: 'elena.petrova@gmail.com', accountType: 'Personal', role: 'Admin', status: 'Active', createdDate: '2026-02-10', balance: 9340.40 }
+  { id: 'usr-1', firstName: 'Sarah', lastName: 'Jenkins', email: 'sarah.j@gmail.com', password: 'Password123!', accountType: 'Personal', role: 'Compliance', status: 'Active', createdDate: '2026-01-15', balance: 45290.50 },
+  { id: 'usr-2', firstName: 'Michael', lastName: 'Chen', email: 'mchen.biz@work.com', password: 'Password123!', accountType: 'Business', role: 'Admin', status: 'Active', createdDate: '2025-11-04', balance: 189400.00 },
+  { id: 'usr-3', firstName: 'Emily', lastName: 'Rodriguez', email: 'emily.rod@outlook.com', password: 'Password123!', accountType: 'Personal', role: 'Editor', status: 'Active', createdDate: '2026-03-22', balance: 5200.25 },
+  { id: 'usr-4', firstName: 'Alex', lastName: 'Kaufman', email: 'kaufman.alex@gmail.com', password: 'Password123!', accountType: 'Personal', role: 'Developer', status: 'KYC Pending', createdDate: '2026-06-18', balance: 1250.00 },
+  { id: 'usr-5', firstName: 'Jordan', lastName: 'Blake', email: 'jordanb@techcorp.io', password: 'Password123!', accountType: 'Business', role: 'Admin', status: 'Suspended', createdDate: '2025-05-12', balance: 87500.00 },
+  { id: 'usr-6', firstName: 'Elena', lastName: 'Petrova', email: 'elena.petrova@gmail.com', password: 'Password123!', accountType: 'Personal', role: 'Admin', status: 'Active', createdDate: '2026-02-10', balance: 9340.40 }
 ];
 
 const initialAccounts: AdminAccount[] = [
